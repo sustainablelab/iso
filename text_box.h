@@ -12,6 +12,7 @@ typedef struct
     SDL_Color bg;
     int margin;
     bool show;
+    bool focus;
 } TextBox;
 
 #endif // __TEXT_BOX_H__
