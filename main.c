@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
     TextBox dCB;                                                // Debug control box
     char debug_controls[128];                                   // Small debug buffer
     char debug_input_buffer[4];                                 // Store at most 4 char
-    char *debug_i_end = debug_input_buffer + 4*sizeof(char);
+    char *debug_i_end = debug_input_buffer + 3*sizeof(char);    // End is N-1 after start
     char *debug_i = debug_input_buffer; *debug_i = '\0';
     setup_debug_box(&dCB, debug_controls);
     // Mode
@@ -108,6 +108,7 @@ int main(int argc, char *argv[])
                         const char *c = e.text.text;
                         while(  (*c!='\0') && (debug_i < debug_i_end)  )
                         { *debug_i++ = *c++; }
+                        if(  debug_i > debug_i_end  ) debug_i = debug_i_end;
                         *debug_i = '\0';
                     }
                 }
@@ -115,6 +116,14 @@ int main(int argc, char *argv[])
                 {
                     switch(  e.key.keysym.sym  )
                     {
+                        case SDLK_BACKSPACE:
+                            if(  mode == DEBUG_INSERT_MODE  )
+                            {
+                                debug_i--;
+                                if(  debug_i < debug_input_buffer  ) debug_i = debug_input_buffer;
+                                *debug_i = '\0';
+                            }
+                            break;
                         case SDLK_ESCAPE:
                             switch(mode)
                             {
