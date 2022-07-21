@@ -1,3 +1,7 @@
+/* *************TODO***************
+ * 1. Add green and blue inputs
+ * 2. How do I detect which one I'm editing?
+ * *******************************/
 #include <SDL.h>
 #include <SDL_ttf.h>
 #include <stdbool.h>
@@ -10,6 +14,11 @@
 SDL_Window *win;                                                // The window
 SDL_Renderer *ren;                                              // The renderer
 TTF_Font *debug_font;                                           // Debug overlay font
+
+typedef struct
+{
+    SDL_Color bg;                                               // Control bgnd color
+} Ctrl;
 
 void shutdown(void)
 {
@@ -57,6 +66,7 @@ int main(int argc, char *argv[])
     // Game state
     bool quit = false;
     bool show_debug = true;                                     // Start debug visible
+    Ctrl ctrl = {.bg={128,128,0,0}};
     // Main debug overlay -- print whatever I want here
     TextBox dTB;                                                // Debug overlay Textbox
     char debug_text_buffer[2048];                               // Max 2048 char overlay
@@ -124,6 +134,14 @@ int main(int argc, char *argv[])
                                 *debug_i = '\0';
                             }
                             break;
+                        case SDLK_RETURN:
+                            if(  mode == DEBUG_INSERT_MODE  )
+                            {
+                                // TODO: do something to text vis to indicate "submitted"
+                                ctrl.bg.r = atoi(debug_input_buffer);
+                                mode = DEBUG_WINDOW_MODE;       // Done entering text
+                            }
+                            break;
                         case SDLK_ESCAPE:
                             switch(mode)
                             {
@@ -145,7 +163,6 @@ int main(int argc, char *argv[])
                         case SDLK_SEMICOLON:
                             if(  kmod & (KMOD_LSHIFT|KMOD_RSHIFT)  )
                             {
-                                /* dCB.focus = !dCB.focus;         // : : Debug window mode */
                                 if(  mode != DEBUG_WINDOW_MODE  ) dCB.focus = true;
                                 mode = DEBUG_WINDOW_MODE;
                             }
@@ -187,18 +204,28 @@ int main(int argc, char *argv[])
 
         // Render
         { // Background
-            SDL_SetRenderDrawColor(ren, 128,128,0,0);
+            SDL_SetRenderDrawColor(ren, ctrl.bg.r,ctrl.bg.g,ctrl.bg.b,ctrl.bg.a);
             SDL_RenderClear(ren);
         }
         if(  show_debug  )
         { // Debug overlay
             { // Fill main overlay text buffer with characters
                 char *d = dTB.text;                             // d : see macro "print"
-                print("This is the main debug overlay.\nStill the main debug overlay.");
+                print("- Press `:` (COLON) to navigate this debug overlay.\n"
+                      "  A green highlight appears.\n"
+                      "  - Press `h` and `l` to move this highlight.\n"
+                      "- Press `i` (insert) to edit the highlighted value.\n"
+                      "  - Very limited text editing ability: "
+                      "enter numbers, Backspace, Enter to submit new value.\n"
+                      "- Press `Esc` to leave insert mode.\n"
+                      "- Press `Esc` to leave the highlight mode.\n"
+                      "- Press `Esc` again and the game quits.");
             }
             { // Fill debug control text buffer with characters
                 char *d = dCB.text;                             // d : see macro "print"
-                print("Bgnd\n----\nR: ");print(debug_input_buffer);
+                print("Bgnd   \n");
+                print("-------\n");
+                print("R: ");print(debug_input_buffer);
             }
             { // Draw the control box text to its texture
                 SDL_Surface *surf = TTF_RenderText_Blended_Wrapped(debug_font,
