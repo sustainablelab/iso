@@ -1,6 +1,7 @@
 /* *************TODO***************
  * 1. Add green and blue inputs
  * 2. How do I detect which one I'm editing?
+ * 3. Isometric mapping!
  * *******************************/
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -10,18 +11,61 @@
 #include "text_box.h"
 #include "print.h"
 
+const char * main_overlay_text = ""
+    "- Press `:` (COLON) to navigate this debug overlay.\n"
+    "  A green highlight appears.\n\n"
+    "  - Press `h` and `l` to move this highlight.\n\n"
+    "- Press `i` (insert) to edit the highlighted value.\n"
+    "  - Press `Esc` to leave insert mode.\n"
+    "  - Very limited text editing ability:\n"
+    "    - enter numbers (value is 0 to 255)\n"
+    "    - Backspace to erase\n"
+    "    - Enter to submit new value and exit insert mode\n\n"
+    "- Press `Esc` to leave insert mode.\n"
+    "- Press `Esc` to leave the highlight mode.\n"
+    "- Press `Esc` again and the game quits.";
+
+
+#define NUM_CTRLS 4
+SDL_Color dT_color = {255,255,255,255};                         // Debug text color
+SDL_Color dT_glow = {128,255,0,200};                            // Debug text focus glow
+int dT_margin = 5;                                              // Debug text margin
+
+enum ctrl_index {R, G, B, A};
+
+typedef struct
+{
+    /* SDL_Color bg;                                              // Control bgnd color */
+    int val[NUM_CTRLS];                                         // Control value
+    // Get the control value from user text input
+    char *text[NUM_CTRLS];                                      // Buffer for all text
+    const char *label[NUM_CTRLS];                               // Text label (ex "R: ")
+    char *buff_in[NUM_CTRLS];                                   // Control text input buff
+    char *buff_c[NUM_CTRLS];                                    // Walk the input buff
+    char *buff_end[NUM_CTRLS];                                  // Store where buff ends
+    SDL_Texture *tex[NUM_CTRLS];                                // Textures
+    SDL_Rect fg_rect[NUM_CTRLS];                                // Text bounding box
+    SDL_Rect bg_rect[NUM_CTRLS];                                // Text box with margins
+    bool focus[NUM_CTRLS];                                      // Has user's focus
+} Ctrl_SOA;
+
 // Singletons
 SDL_Window *win;                                                // The window
 SDL_Renderer *ren;                                              // The renderer
 TTF_Font *debug_font;                                           // Debug overlay font
-
-typedef struct
-{
-    SDL_Color bg;                                               // Control bgnd color
-} Ctrl;
+Ctrl_SOA *cS;                                                   // Debug controls are SOA
 
 void shutdown(void)
 {
+    for (int i=0; i<NUM_CTRLS; i++)
+    { // Free all string buffers for control text inputs
+        free(cS->text[i]);
+        cS->text[i] = NULL;
+        free(cS->buff_in[i]);
+        cS->buff_in[i] = NULL;
+        cS->buff_c[i] = NULL;
+        cS->buff_end[i] = NULL;
+    }
     TTF_CloseFont(debug_font);
     TTF_Quit();
     SDL_DestroyRenderer(ren);
@@ -42,9 +86,9 @@ int font_setup(TTF_Font **font)
 void setup_debug_box(TextBox *tb, char *buffer)
 {
     tb->text = buffer;                                          // Point at text buffer
-    tb->fg = (SDL_Color){255,255,255,255};                      // White text
-    tb->bg = (SDL_Color){128,255,0,200};                        // Green glow when active
-    tb->margin = 5;                                             // Space (pix) to win edge
+    tb->fg = dT_color;                                          // White text
+    tb->bg = dT_glow;                                           // Green glow when active
+    tb->margin = dT_margin;                                     // Space (pix) to win edge
     tb->fg_rect=(SDL_Rect){.x=tb->margin, .y=tb->margin,        // Left/Top edge is margin
                            .w=0, .h=0};                         // Will size text in loop
     tb->bg_rect=(SDL_Rect){0};                                  // Will size bgnd in loop
@@ -66,18 +110,51 @@ int main(int argc, char *argv[])
     // Game state
     bool quit = false;
     bool show_debug = true;                                     // Start debug visible
-    Ctrl ctrl = {.bg={128,128,0,0}};
+    Ctrl_SOA controls_in_debug_overlay;                         // Allocate struct mem
+    cS = &controls_in_debug_overlay;                            // Point global at struct
+    for (int i=0; i<NUM_CTRLS; i++)
+    {
+        switch(i)
+        {
+            case R: cS->label[i] = "R: "; cS->val[i] = 128; break;
+            case G: cS->label[i] = "G: "; cS->val[i] = 128; break;
+            case B: cS->label[i] = "B: "; cS->val[i] = 0;   break;
+            case A: cS->label[i] = "A: "; cS->val[i] = 0;   break;
+            default: break;
+        }
+    }
+    for (int i=0; i<NUM_CTRLS; i++)
+    { // Create string buffers for control text inputs
+        cS->text[i] = malloc(sizeof(char)*8);                   // Entire ctrl: at most 8
+        int len = 4;
+        cS->buff_in[i] = malloc(sizeof(char)*len);              // Input: at most 4 char
+        cS->buff_c[i] = cS->buff_in[i];                         // Point at buff start
+        cS->buff_end[i] = cS->buff_in[i] + (len-1)*sizeof(char);// Point at buff end
+        *(cS->buff_c[i]) = '\0';                                // nul-terminate start
+    }
+    for (int i=0; i<NUM_CTRLS; i++)
+    { // Initialize text fgnd and bgnd rectangles to zero
+        cS->fg_rect[i].x = dT_margin;
+        cS->fg_rect[i].y = dT_margin;
+        cS->fg_rect[i].w = 0;
+        cS->fg_rect[i].h = 0;
+        cS->bg_rect[i].x = 0;
+        cS->bg_rect[i].y = 0;
+        cS->bg_rect[i].w = 0;
+        cS->bg_rect[i].h = 0;
+    }
+
     // Main debug overlay -- print whatever I want here
     TextBox dTB;                                                // Debug overlay Textbox
     char debug_text_buffer[2048];                               // Max 2048 char overlay
     setup_debug_box(&dTB, debug_text_buffer);                   // Init debug overlay
-    // Smaller text window on the left just for some controls
+    // Smaller text window on the left to title the controls
     TextBox dCB;                                                // Debug control box
-    char debug_controls[128];                                   // Small debug buffer
-    char debug_input_buffer[4];                                 // Store at most 4 char
-    char *debug_i_end = debug_input_buffer + 3*sizeof(char);    // End is N-1 after start
-    char *debug_i = debug_input_buffer; *debug_i = '\0';
+    char debug_controls[20];                                    // Small debug buffer
     setup_debug_box(&dCB, debug_controls);
+
+
+    
     // Mode
     enum {
         GAME_MODE,
@@ -116,10 +193,10 @@ int main(int argc, char *argv[])
                         // TODO: don't insert the `i` that starts insert mode
                         // Copy text
                         const char *c = e.text.text;
-                        while(  (*c!='\0') && (debug_i < debug_i_end)  )
-                        { *debug_i++ = *c++; }
-                        if(  debug_i > debug_i_end  ) debug_i = debug_i_end;
-                        *debug_i = '\0';
+                        while(  (*c!='\0') && (cS->buff_c[R] < cS->buff_end[R])  )
+                        { *(cS->buff_c[R])++ = *c++; }
+                        if(  cS->buff_c[R] > cS->buff_end[R]  ) cS->buff_c[R] = cS->buff_end[R];
+                        *cS->buff_c[R] = '\0';                  // nul-terminate string
                     }
                 }
                 if(  e.type == SDL_KEYDOWN  )
@@ -129,16 +206,16 @@ int main(int argc, char *argv[])
                         case SDLK_BACKSPACE:
                             if(  mode == DEBUG_INSERT_MODE  )
                             {
-                                debug_i--;
-                                if(  debug_i < debug_input_buffer  ) debug_i = debug_input_buffer;
-                                *debug_i = '\0';
+                                cS->buff_c[R]--;
+                                if(  cS->buff_c[R] < cS->buff_in[R]  ) cS->buff_c[R] = cS->buff_in[R];
+                                *(cS->buff_c[R]) = '\0';        // nul-terminate string
                             }
                             break;
                         case SDLK_RETURN:
                             if(  mode == DEBUG_INSERT_MODE  )
                             {
                                 // TODO: do something to text vis to indicate "submitted"
-                                ctrl.bg.r = atoi(debug_input_buffer);
+                                cS->val[R] = atoi(cS->buff_in[R]);
                                 mode = DEBUG_WINDOW_MODE;       // Done entering text
                             }
                             break;
@@ -204,30 +281,26 @@ int main(int argc, char *argv[])
 
         // Render
         { // Background
-            SDL_SetRenderDrawColor(ren, ctrl.bg.r,ctrl.bg.g,ctrl.bg.b,ctrl.bg.a);
+            SDL_SetRenderDrawColor(ren, cS->val[R],cS->val[G],cS->val[B],cS->val[A]);
             SDL_RenderClear(ren);
         }
         if(  show_debug  )
         { // Debug overlay
             { // Fill main overlay text buffer with characters
                 char *d = dTB.text;                             // d : see macro "print"
-                print("- Press `:` (COLON) to navigate this debug overlay.\n"
-                      "  A green highlight appears.\n"
-                      "  - Press `h` and `l` to move this highlight.\n"
-                      "- Press `i` (insert) to edit the highlighted value.\n"
-                      "  - Very limited text editing ability: "
-                      "enter numbers, Backspace, Enter to submit new value.\n"
-                      "- Press `Esc` to leave insert mode.\n"
-                      "- Press `Esc` to leave the highlight mode.\n"
-                      "- Press `Esc` again and the game quits.");
+                print(main_overlay_text);
             }
-            { // Fill debug control text buffer with characters
+            { // Fill debug control title text buffer with characters
                 char *d = dCB.text;                             // d : see macro "print"
-                print("Bgnd   \n");
+                print("Control\n");
                 print("-------\n");
-                print("R: ");print(debug_input_buffer);
             }
-            { // Draw the control box text to its texture
+            for(int i=0; i<NUM_CTRLS; i++)
+            { // Fill control text buffers with characters
+                char *d = cS->text[i];                          // d : see macro "print"
+                print(cS->label[i]); print(cS->buff_in[i]);
+            }
+            { // Draw the control title text to its texture
                 SDL_Surface *surf = TTF_RenderText_Blended_Wrapped(debug_font,
                                         dCB.text,               // Text buffer to render
                                         dCB.fg,                 // Text color
@@ -239,6 +312,23 @@ int main(int argc, char *argv[])
                                     &dCB.fg_rect.h);            // Get text height
                 dCB.bg_rect.h = dCB.fg_rect.h + 2*dCB.margin;   // Extend bgnd below text
                 dCB.bg_rect.w = dCB.fg_rect.w + 2*dCB.margin;   // Box around text
+            }
+            for(int i=0; i<NUM_CTRLS; i++)
+            { // Draw the control text inputs to their textures
+                SDL_Surface *surf = TTF_RenderText_Blended_Wrapped(
+                        debug_font,
+                        cS->text[i],                            // Text buffer to render
+                        dT_color,                               // Text color
+                        0);                                     // Wrap on new lines
+                cS->tex[i] = SDL_CreateTextureFromSurface(ren, surf);
+                SDL_FreeSurface(surf);
+                SDL_QueryTexture(cS->tex[i], NULL, NULL,
+                                    &(cS->fg_rect[i].w),           // Get text width
+                                    &(cS->fg_rect[i].h));          // Get text height
+                // Slide text down based on index
+                cS->fg_rect[i].y = dT_margin + dCB.bg_rect.h + i*(cS->fg_rect[i].h);
+                cS->bg_rect[i].h = cS->fg_rect[i].h + 2*dT_margin;    // Extend bgnd below text
+                cS->bg_rect[i].w = cS->fg_rect[i].w + 2*dT_margin;    // Box around text
             }
             { // Draw the main overlay text to the debug overlay texture
                 SDL_Surface *surf = TTF_RenderText_Blended_Wrapped(debug_font,
@@ -258,25 +348,50 @@ int main(int argc, char *argv[])
                 SDL_SetRenderDrawColor(ren,0,0,0,127);          // Blk bgnd, 50% opacity
                 int tallest;
                 { // Get height of tallest text
-                    int t = dTB.fg_rect.h; int c = dCB.fg_rect.h;
+                    int t = dTB.fg_rect.h;
+                    /* int c = dCB.fg_rect.h + 4*(cS->fg_rect[R].h); */
+                    int c = dCB.fg_rect.h;
                     tallest = (t > c) ? t : c;
                 }
                 SDL_Rect bg_rect = {.x=0, .y=0, .w=wI.w, .h=(tallest + 2*dTB.margin)};
                 SDL_RenderFillRect(ren, &bg_rect);              // Draw black bgnd
+                for( int i=0; i<NUM_CTRLS; i++)
+                {
+                    if(  cS->focus[i]  )                        // Glow if in user's focus
+                    {
+                        SDL_SetRenderDrawColor(ren, dT_glow.r, dT_glow.g, dT_glow.b, dT_glow.a);
+                        SDL_RenderDrawRect(ren, &cS->bg_rect[i]);      // Draw green glow box
+                        SDL_SetRenderDrawColor(ren, dT_glow.r, dT_glow.g, dT_glow.b, 100);
+                        SDL_RenderFillRect(ren, &cS->bg_rect[i]);      // Fill green glow box
+                    }
+                }
                 if(  dCB.focus  )                               // Glow if in user's focus
                 {
                     SDL_SetRenderDrawColor(ren, dCB.bg.r, dCB.bg.g, dCB.bg.b, dCB.bg.a);
                     SDL_RenderDrawRect(ren, &dCB.bg_rect);      // Draw green glow box
+                    SDL_SetRenderDrawColor(ren, dCB.bg.r, dCB.bg.g, dCB.bg.b, 100);
+                    SDL_RenderFillRect(ren, &dCB.bg_rect);      // Fill green glow box
                 }
                 else if(  dTB.focus  )
                 {
                     SDL_SetRenderDrawColor(ren, dTB.bg.r, dTB.bg.g, dTB.bg.b, dTB.bg.a);
                     SDL_RenderDrawRect(ren, &dTB.bg_rect);      // Draw green glow box
+                    SDL_SetRenderDrawColor(ren, dTB.bg.r, dTB.bg.g, dTB.bg.b, 100);
+                    SDL_RenderFillRect(ren, &dTB.bg_rect);      // Fill green glow box
                 }
+                // Render text
                 SDL_RenderCopy(ren, dTB.tex, NULL, &dTB.fg_rect);
                 SDL_RenderCopy(ren, dCB.tex, NULL, &dCB.fg_rect);
+                for( int i=0; i<NUM_CTRLS; i++)
+                {
+                    SDL_RenderCopy(ren, cS->tex[i], NULL, &(cS->fg_rect[i]));
+                }
                 SDL_DestroyTexture(dTB.tex);
                 SDL_DestroyTexture(dCB.tex);
+                for( int i=0; i<NUM_CTRLS; i++)
+                {
+                    SDL_DestroyTexture(cS->tex[i]);
+                }
             }
         }
         { // Present to screen
