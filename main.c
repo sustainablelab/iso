@@ -1,7 +1,10 @@
 /* *************TODO***************
- * 1. Add green and blue inputs
- * 2. How do I detect which one I'm editing?
- * 3. Isometric mapping!
+ * ~1. Add green and blue inputs~
+ * ~2. How do I detect which one I'm editing? I'm making each its own box with an SOA~
+ * 1. Show initial values of inputs when program starts
+ * 2. Improve text-editing interface (see TODO)
+ * 3. Add a cursor and give it navigation inside the text
+ * 4. Isometric mapping!
  * *******************************/
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -14,14 +17,15 @@
 const char * main_overlay_text = ""
     "- Press `:` (COLON) to navigate this debug overlay.\n"
     "  A green highlight appears.\n\n"
-    "  - Press `h` and `l` to move this highlight.\n\n"
-    "- Press `i` (insert) to edit the highlighted value.\n"
+    "  - Press `j,k,h,l` to move this highlight.\n\n"
+    "- Press `i` (insert) to edit the highlighted value (RGBA only).\n"
     "  - Press `Esc` to leave insert mode.\n"
     "  - Very limited text editing ability:\n"
     "    - enter numbers (value is 0 to 255)\n"
     "    - Backspace to erase\n"
-    "    - Enter to submit new value and exit insert mode\n\n"
-    "- Press `Esc` to leave insert mode.\n"
+    "    - Enter to submit value\n"
+    "    - Shift+Enter to submit value and move onto next input\n"
+    "    - Press `Esc` to leave insert mode.\n\n"
     "- Press `Esc` to leave the highlight mode.\n"
     "- Press `Esc` again and the game quits.";
 
@@ -116,10 +120,10 @@ int main(int argc, char *argv[])
     {
         switch(i)
         {
-            case R: cS->label[i] = "R: "; cS->val[i] = 128; break;
-            case G: cS->label[i] = "G: "; cS->val[i] = 128; break;
-            case B: cS->label[i] = "B: "; cS->val[i] = 0;   break;
-            case A: cS->label[i] = "A: "; cS->val[i] = 0;   break;
+            case R: cS->label[i] = "R: "; cS->val[i] = 128; cS->focus[i]=false; break;
+            case G: cS->label[i] = "G: "; cS->val[i] = 128; cS->focus[i]=false; break;
+            case B: cS->label[i] = "B: "; cS->val[i] = 0;   cS->focus[i]=false; break;
+            case A: cS->label[i] = "A: "; cS->val[i] = 0;   cS->focus[i]=false; break;
             default: break;
         }
     }
@@ -193,10 +197,17 @@ int main(int argc, char *argv[])
                         // TODO: don't insert the `i` that starts insert mode
                         // Copy text
                         const char *c = e.text.text;
-                        while(  (*c!='\0') && (cS->buff_c[R] < cS->buff_end[R])  )
-                        { *(cS->buff_c[R])++ = *c++; }
-                        if(  cS->buff_c[R] > cS->buff_end[R]  ) cS->buff_c[R] = cS->buff_end[R];
-                        *cS->buff_c[R] = '\0';                  // nul-terminate string
+                        for( int i=0; i<NUM_CTRLS; i++ )
+                        {
+                            if(  cS->focus[i]  )
+                            {
+                                while(  (*c!='\0') && (cS->buff_c[i] < cS->buff_end[i])  )
+                                { *(cS->buff_c[i])++ = *c++; }
+                                if(  cS->buff_c[i] > cS->buff_end[i]  ) cS->buff_c[i] = cS->buff_end[i];
+                                *cS->buff_c[i] = '\0';                  // nul-terminate string
+                                break;
+                            }
+                        }
                     }
                 }
                 if(  e.type == SDL_KEYDOWN  )
@@ -206,17 +217,45 @@ int main(int argc, char *argv[])
                         case SDLK_BACKSPACE:
                             if(  mode == DEBUG_INSERT_MODE  )
                             {
-                                cS->buff_c[R]--;
-                                if(  cS->buff_c[R] < cS->buff_in[R]  ) cS->buff_c[R] = cS->buff_in[R];
-                                *(cS->buff_c[R]) = '\0';        // nul-terminate string
+                                for( int i=0; i<NUM_CTRLS; i++ )
+                                {
+                                    if(  cS->focus[i]  )
+                                    {
+                                        cS->buff_c[i]--;
+                                        if(  cS->buff_c[i] < cS->buff_in[i]  ) cS->buff_c[i] = cS->buff_in[i];
+                                        *(cS->buff_c[i]) = '\0';        // nul-terminate string
+                                        break;
+                                    }
+                                }
                             }
                             break;
                         case SDLK_RETURN:
                             if(  mode == DEBUG_INSERT_MODE  )
                             {
-                                // TODO: do something to text vis to indicate "submitted"
-                                cS->val[R] = atoi(cS->buff_in[R]);
-                                mode = DEBUG_WINDOW_MODE;       // Done entering text
+                                for( int i=0; i<NUM_CTRLS; i++ )
+                                {
+                                    if(  cS->focus[i]  )
+                                    {
+                                        // TODO: do something to text vis to indicate "submitted"
+                                        cS->val[i] = atoi(cS->buff_in[i]);
+                                        break;
+                                    }
+                                }
+                                // TODO: should return take you out of insert mode or not?
+                                /* mode = DEBUG_WINDOW_MODE;       // Done entering text */
+                                if(  kmod & (KMOD_LSHIFT|KMOD_RSHIFT)  )
+                                {
+                                    for( int i=0; i<NUM_CTRLS-1; i++ )
+                                    {
+                                        if(  cS->focus[i]  )
+                                        {
+                                            cS->focus[i] = false;
+                                            cS->focus[i+1] = true;
+                                            break;
+                                        }
+                                    }
+
+                                }
                             }
                             break;
                         case SDLK_ESCAPE:
@@ -264,12 +303,60 @@ int main(int argc, char *argv[])
                                 }
                             }
                             break;
-                        case SDLK_i:
+                        case SDLK_j:
                             if(  mode == DEBUG_WINDOW_MODE  )
                             {
                                 if(  dCB.focus  )
                                 {
-                                    mode = DEBUG_INSERT_MODE;
+                                    dCB.focus = false;
+                                    cS->focus[0] = true;
+                                }
+                                else if(  !(dCB.focus  || dTB.focus)  )
+                                {
+                                    for(int i=0; i<(NUM_CTRLS-1); i++)
+                                    {
+                                        if(  cS->focus[i]  )
+                                        {
+                                            cS->focus[i] = false;
+                                            cS->focus[i+1] = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                        case SDLK_k:
+                            if(  mode == DEBUG_WINDOW_MODE  )
+                            {
+                                if(  cS->focus[0]  )
+                                {
+                                    cS->focus[0] = false;
+                                    dCB.focus = true;
+                                }
+                                else
+                                {
+                                    for( int i=1; i<NUM_CTRLS; i++ )
+                                    {
+                                        if(  cS->focus[i]  )
+                                        {
+                                            cS->focus[i] = false;
+                                            cS->focus[i-1] = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                        case SDLK_i:
+                            if(  mode == DEBUG_WINDOW_MODE  )
+                            {
+                                for( int i=0; i<NUM_CTRLS; i++)
+                                {
+                                    if(  cS->focus[i]  )
+                                    {
+                                        mode = DEBUG_INSERT_MODE;
+                                        break;
+                                    }
                                 }
                             }
                             break;
@@ -323,12 +410,13 @@ int main(int argc, char *argv[])
                 cS->tex[i] = SDL_CreateTextureFromSurface(ren, surf);
                 SDL_FreeSurface(surf);
                 SDL_QueryTexture(cS->tex[i], NULL, NULL,
-                                    &(cS->fg_rect[i].w),           // Get text width
-                                    &(cS->fg_rect[i].h));          // Get text height
+                                    &(cS->fg_rect[i].w),        // Get text width
+                                    &(cS->fg_rect[i].h));       // Get text height
                 // Slide text down based on index
                 cS->fg_rect[i].y = dT_margin + dCB.bg_rect.h + i*(cS->fg_rect[i].h);
-                cS->bg_rect[i].h = cS->fg_rect[i].h + 2*dT_margin;    // Extend bgnd below text
-                cS->bg_rect[i].w = cS->fg_rect[i].w + 2*dT_margin;    // Box around text
+                cS->bg_rect[i].y = cS->fg_rect[i].y;
+                cS->bg_rect[i].h = cS->fg_rect[i].h;            // Fit text height
+                cS->bg_rect[i].w = dCB.bg_rect.w;               // Match title width
             }
             { // Draw the main overlay text to the debug overlay texture
                 SDL_Surface *surf = TTF_RenderText_Blended_Wrapped(debug_font,
@@ -349,8 +437,8 @@ int main(int argc, char *argv[])
                 int tallest;
                 { // Get height of tallest text
                     int t = dTB.fg_rect.h;
-                    /* int c = dCB.fg_rect.h + 4*(cS->fg_rect[R].h); */
-                    int c = dCB.fg_rect.h;
+                    /* int c = dCB.fg_rect.h; */
+                    int c = dCB.fg_rect.h + 4*(cS->fg_rect[R].h);
                     tallest = (t > c) ? t : c;
                 }
                 SDL_Rect bg_rect = {.x=0, .y=0, .w=wI.w, .h=(tallest + 2*dTB.margin)};
