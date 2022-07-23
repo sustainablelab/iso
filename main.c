@@ -1,7 +1,6 @@
 /* *************TODO***************
  * ~1. Add green and blue inputs~
  * ~2. How do I detect which one I'm editing? I'm making each its own box with an SOA~
- * 1. Show initial values of inputs when program starts
  * 2. Improve text-editing interface (see TODO)
  * 3. Add a cursor and give it navigation inside the text
  * 4. Isometric mapping!
@@ -23,7 +22,6 @@ SDL_Window *win;                                                // The window
 SDL_Renderer *ren;                                              // The renderer
 TTF_Font *debug_font;                                           // Debug overlay font
 Ctrl_SOA *cS;                                                   // Debug controls are SOA
-
 
 void shutdown(void)
 {
@@ -52,7 +50,6 @@ int font_setup(TTF_Font **font)
     if(  font_load(font, p, s) < 0  ) { shutdown(); return -1;} // Load the debug font
     return 0;
 }
-
 
 int main(int argc, char *argv[])
 {
@@ -321,7 +318,12 @@ int main(int argc, char *argv[])
             for(int i=0; i<NUM_CTRLS; i++)
             { // Fill control text buffers with characters
                 char *d = cS->text[i];                          // d : see macro "print"
-                print(cS->label[i]); print(cS->buff_in[i]);
+                print(cS->label[i]);
+                if(  cS->focus[i] && (  mode == DEBUG_INSERT_MODE  )  )
+                {
+                    print(cS->buff_in[i]);
+                }
+                else printint(16,cS->val[i]);
             }
             { // Draw the control title text to its texture
                 SDL_Surface *surf = TTF_RenderText_Blended_Wrapped(debug_font,
@@ -357,7 +359,6 @@ int main(int argc, char *argv[])
                                     &(cS->fg_rect[i].w),        // Get text width
                                     &(cS->fg_rect[i].h));       // Get text height
                 // Slide text down based on index
-                cS->fg_rect[i].x = dT_margin;
                 cS->fg_rect[i].y = dT_margin + dCB.bg_rect.h + i*(cS->fg_rect[i].h);
                 cS->bg_rect[i].y = cS->fg_rect[i].y;
                 cS->bg_rect[i].h = cS->fg_rect[i].h;            // Fit text height
