@@ -1,10 +1,16 @@
 /* *************TODO***************
  * 1. Isometric mapping!
  * 2. Add a cursor and give it navigation inside the text
+ * 3. I like my controls:
+ *    - just add a line to the CTRL_TABLE and I have a new control
+ *    - access the value in the control with cS->val[NAME]
+ *    - (NAME is the first column in the table)
+ *    But I don't like the stand-alone textbox objects.
  * *******************************/
 #include <SDL.h>
 #include <SDL_ttf.h>
 #include <stdbool.h>
+#include "main.h"                                               // func prototypes
 #include "window_info.h"
 #include "print.h"
 #include "font.h"
@@ -22,15 +28,7 @@ Ctrl_SOA *cS;                                                   // Debug control
 
 void shutdown(void)
 {
-    for (int i=0; i<NUM_CTRLS; i++)
-    { // Free all string buffers for control text inputs
-        free(cS->text[i]);
-        cS->text[i] = NULL;
-        free(cS->buff_in[i]);
-        cS->buff_in[i] = NULL;
-        cS->buff_c[i] = NULL;
-        cS->buff_end[i] = NULL;
-    }
+    ctrl_free(cS);
     TTF_CloseFont(debug_font);
     TTF_Quit();
     SDL_DestroyRenderer(ren);
@@ -38,15 +36,6 @@ void shutdown(void)
     SDL_Quit();
 }
 
-int font_setup(TTF_Font **font)
-{
-    if(  font_init() < 0  ) { shutdown(); return -1; }          // Init SDL_ttf
-    // Font p : path and s : size
-    const char *p = "fonts/ProggyClean.ttf";                    // Path to debug font
-    int s = 16;                                                 // Font point size
-    if(  font_load(font, p, s) < 0  ) { shutdown(); return -1;} // Load the debug font
-    return 0;
-}
 
 int main(int argc, char *argv[])
 {
@@ -63,17 +52,13 @@ int main(int argc, char *argv[])
     // Game state
     bool quit = false;
     bool show_debug = true;                                     // Start debug visible
+    bool show_help = false;                                     // Start with help hidden
     Ctrl_SOA controls_in_debug_overlay;                         // Allocate struct mem
     cS = &controls_in_debug_overlay;                            // Point global at struct
     ctrl_load_table(cS);
-    for (int i=0; i<NUM_CTRLS; i++)
-    { // Create string buffers for control text inputs
-        cS->text[i] = malloc(sizeof(char)*8);                   // Entire ctrl: at most 8
-        int len = 4;
-        cS->buff_in[i] = malloc(sizeof(char)*len);              // Input: at most 4 char
-        cS->buff_c[i] = cS->buff_in[i];                         // Point at buff start
-        cS->buff_end[i] = cS->buff_in[i] + (len-1)*sizeof(char);// Point at buff end
-        *(cS->buff_c[i]) = '\0';                                // nul-terminate start
+    { // Overwrite X,Y max values with window size
+        cS->max_val[X1] = wI.w; cS->max_val[Y1] = wI.h;
+        cS->max_val[X2] = wI.w; cS->max_val[Y2] = wI.h;
     }
 
     // Main debug overlay -- print whatever I want here
@@ -110,8 +95,16 @@ int main(int argc, char *argv[])
         SDL_Keymod kmod = SDL_GetModState();                    // kmod : OR'd modifiers
         { // Filtered (rapid fire keys)
             SDL_PumpEvents();
-            /* const Uint8 *k = SDL_GetKeyboardState(NULL);        // Get all keys */
-            /* if(  k[SDL_SCANCODE_ESCAPE]  ) quit = true;         // Esc : quit */
+            const Uint8 *k = SDL_GetKeyboardState(NULL);        // Get all keys
+            if(  !(kmod & KMOD_SHIFT)  )         // Shift : ignore arrows
+            {
+                if(  k[SDL_SCANCODE_UP]  ) { ctrl_inc(cS); }    // Up Arrow : inc val
+                if(  k[SDL_SCANCODE_DOWN]  ) { ctrl_dec(cS); }  // Dn Arrow : dec val
+                if(  k[SDL_SCANCODE_UP] || k[SDL_SCANCODE_DOWN]  ) // Handle mode logic
+                {
+                    if(  mode == DEBUG_INSERT_MODE  ) { mode = DEBUG_WINDOW_MODE; }
+                }
+            }
         }
         { // Polled (delayed repeat fire after initial key press)
             SDL_Event e;
@@ -119,31 +112,16 @@ int main(int argc, char *argv[])
             {
                 if(  e.type == SDL_TEXTINPUT  )
                 {
-                    if(  mode == DEBUG_INSERT_MODE  )
-                    {
-                        // Copy text
-                        const char *c = e.text.text;
-                        for( int i=0; i<NUM_CTRLS; i++ )
-                        {
-                            if(  cS->focus[i]  )
-                            {
-                                while(  (*c!='\0') && (cS->buff_c[i] < cS->buff_end[i])  )
-                                { *(cS->buff_c[i])++ = *c++; }
-                                if(  cS->buff_c[i] > cS->buff_end[i]  ) cS->buff_c[i] = cS->buff_end[i];
-                                *cS->buff_c[i] = '\0';                  // nul-terminate string
-                                break;
-                            }
-                        }
-                    }
-                    else if(  mode == DEBUG_INSERT_MODE_i  )
-                    {
-                        mode = DEBUG_INSERT_MODE;
-                    }
+                    if(  mode == DEBUG_INSERT_MODE  ) { ctrl_buff_in(cS, e.text.text); }
+                    else if(  mode == DEBUG_INSERT_MODE_i  ) { mode = DEBUG_INSERT_MODE; }
                 }
                 if(  e.type == SDL_KEYDOWN  )
                 {
                     switch(  e.key.keysym.sym  )
                     {
+                        case SDLK_SLASH:                        // ? : Toggle help
+                            if(  kmod & KMOD_SHIFT  ) { show_help = !show_help; }
+                            break;
                         case SDLK_BACKSPACE:
                             if(  mode == DEBUG_INSERT_MODE  )
                             {
@@ -172,7 +150,7 @@ int main(int argc, char *argv[])
                                 }
                                 // Should return take you out of insert mode or not? Nah.
                                 /* mode = DEBUG_WINDOW_MODE;       // Done entering text */
-                                if(  kmod & (KMOD_LSHIFT|KMOD_RSHIFT)  )
+                                if(  kmod & KMOD_SHIFT  )
                                 {
                                     for( int i=0; i<NUM_CTRLS-1; i++ )
                                     {
@@ -206,7 +184,7 @@ int main(int argc, char *argv[])
                             show_debug = !show_debug;           // Tab: toggle debug vis
                             break;
                         case SDLK_SEMICOLON:
-                            if(  kmod & (KMOD_LSHIFT|KMOD_RSHIFT)  )
+                            if(  kmod & KMOD_SHIFT  )
                             {
                                 if(  mode != DEBUG_WINDOW_MODE  ) dCB.focus = true;
                                 mode = DEBUG_WINDOW_MODE;
@@ -307,9 +285,10 @@ int main(int argc, char *argv[])
         { // Debug overlay
             { // Fill main overlay text buffer with characters
                 char *d = dTB.text;                             // d : see macro "print"
-                print(main_overlay_text);print("\n");
-                /* print("NUM_CTRLS: "); printint(2,NUM_CTRLS); print("\n"); */
                 print("Win: "); printint(4,wI.w); print("x"); printint(4,wI.h); print("\n");
+                /* print("NUM_CTRLS: "); printint(2,NUM_CTRLS); print("\n"); */
+                if(  show_help  ) { print(help_text); }
+                else { print(hint_text); }
             }
             { // Fill debug control title text buffer with characters
                 char *d = dCB.text;                             // d : see macro "print"
@@ -385,10 +364,10 @@ int main(int argc, char *argv[])
                 { // Get height of tallest text
                     int t = dTB.fg_rect.h;
                     /* int c = dCB.fg_rect.h; */
-                    int c = dCB.fg_rect.h + 4*(cS->fg_rect[0].h);
+                    int c = dCB.fg_rect.h + NUM_CTRLS*(cS->fg_rect[0].h) + dT_margin;
                     tallest = (t > c) ? t : c;
                 }
-                SDL_Rect bg_rect = {.x=0, .y=0, .w=wI.w, .h=(tallest + 2*dTB.margin)};
+                SDL_Rect bg_rect = {.x=0, .y=0, .w=wI.w, .h=(tallest + 2*dT_margin)};
                 SDL_RenderFillRect(ren, &bg_rect);              // Draw black bgnd
                 for( int i=0; i<NUM_CTRLS; i++)
                 {
