@@ -102,8 +102,6 @@ int main(int argc, char *argv[])
     char debug_controls[20];                                    // Small debug buffer
     setup_debug_box(&dCB, debug_controls);
 
-
-    
     // Mode
     enum {
         GAME_MODE,
@@ -323,7 +321,8 @@ int main(int argc, char *argv[])
         { // Debug overlay
             { // Fill main overlay text buffer with characters
                 char *d = dTB.text;                             // d : see macro "print"
-                print(main_overlay_text);
+                print(main_overlay_text);print("\n");
+                print("NUM_CTRLS: "); printint(2,NUM_CTRLS); print("\n");
             }
             { // Fill debug control title text buffer with characters
                 char *d = dCB.text;                             // d : see macro "print"

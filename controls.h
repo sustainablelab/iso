@@ -1,6 +1,9 @@
 #ifndef __CONTROLS_H__
 #define __CONTROLS_H__
 
+#include <stdbool.h>
+#include <SDL.h>
+
 #define CTRL_TABLE                      \
     /*    index,label, val, focus  */   \
         X(R,    "R: ", 128, false)      \
@@ -8,23 +11,28 @@
         X(B,    "B: ",   0, false)      \
         X(A,    "A: ",   0, false)
 
+
+// Preprocessor output: enum ctrl_index { R, G, B, A, };
 #define X(index, label, val, focus) index,
 enum ctrl_index { CTRL_TABLE };
 #undef X
 
+// Preprocessor output: const char *ctrl_label[] = { "R: ", "G: ", "B: ", "A: ", };
 #define X(index, label, val, focus) label,
 const char *ctrl_label[] = { CTRL_TABLE };
 #undef X
 
+// Preprocessor output: int ctrl_val[] = { 128, 128, 0, 0, };
 #define X(index, label, val, focus) val,
 int ctrl_val[] = { CTRL_TABLE };
 #undef X
 
+// Preprocessor output: _Bool ctrl_focus[] = { 0 , 0 , 0 , 0 , };
 #define X(index, label, val, focus) focus,
 bool ctrl_focus[] = { CTRL_TABLE };
 #undef X
 
-#define NUM_CTRLS 4
+#define NUM_CTRLS (int)(sizeof(ctrl_focus)/sizeof(bool))
 
 typedef struct
 {
