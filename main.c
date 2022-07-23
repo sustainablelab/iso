@@ -1,9 +1,6 @@
 /* *************TODO***************
- * ~1. Add green and blue inputs~
- * ~2. How do I detect which one I'm editing? I'm making each its own box with an SOA~
- * 2. Improve text-editing interface (see TODO)
- * 3. Add a cursor and give it navigation inside the text
- * 4. Isometric mapping!
+ * 1. Add a cursor and give it navigation inside the text
+ * 2. Isometric mapping!
  * *******************************/
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -90,9 +87,10 @@ int main(int argc, char *argv[])
 
     // Mode
     enum {
-        GAME_MODE,
-        DEBUG_WINDOW_MODE,
-        DEBUG_INSERT_MODE
+        GAME_MODE,                                              // Just reading overlay (if vis)
+        DEBUG_WINDOW_MODE,                                      // Normal mode: move focus
+        DEBUG_INSERT_MODE_i,                                    // Swallow `i` for insert
+        DEBUG_INSERT_MODE,                                      // Actual insert mode
         } mode = GAME_MODE;                                     // Be modal
 
     // Game loop
@@ -123,7 +121,6 @@ int main(int argc, char *argv[])
                 {
                     if(  mode == DEBUG_INSERT_MODE  )
                     {
-                        // TODO: don't insert the `i` that starts insert mode
                         // Copy text
                         const char *c = e.text.text;
                         for( int i=0; i<NUM_CTRLS; i++ )
@@ -137,6 +134,10 @@ int main(int argc, char *argv[])
                                 break;
                             }
                         }
+                    }
+                    else if(  mode == DEBUG_INSERT_MODE_i  )
+                    {
+                        mode = DEBUG_INSERT_MODE;
                     }
                 }
                 if(  e.type == SDL_KEYDOWN  )
@@ -165,12 +166,11 @@ int main(int argc, char *argv[])
                                 {
                                     if(  cS->focus[i]  )
                                     {
-                                        // TODO: do something to text vis to indicate "submitted"
                                         cS->val[i] = atoi(cS->buff_in[i]);
                                         break;
                                     }
                                 }
-                                // TODO: should return take you out of insert mode or not?
+                                // Should return take you out of insert mode or not? Nah.
                                 /* mode = DEBUG_WINDOW_MODE;       // Done entering text */
                                 if(  kmod & (KMOD_LSHIFT|KMOD_RSHIFT)  )
                                 {
@@ -183,7 +183,6 @@ int main(int argc, char *argv[])
                                             break;
                                         }
                                     }
-
                                 }
                             }
                             break;
@@ -195,8 +194,9 @@ int main(int argc, char *argv[])
                                     mode = GAME_MODE;
                                     dCB.focus = false;
                                     dTB.focus = false;
+                                    for(int i=0; i<NUM_CTRLS; i++) cS->focus[i] = false;
                                     break;
-                                case DEBUG_INSERT_MODE:
+                                case DEBUG_INSERT_MODE: case DEBUG_INSERT_MODE_i:
                                     mode = DEBUG_WINDOW_MODE;
                                     break;
                                 default: quit = true; break;
@@ -286,7 +286,7 @@ int main(int argc, char *argv[])
                                 {
                                     if(  cS->focus[i]  )
                                     {
-                                        mode = DEBUG_INSERT_MODE;
+                                        mode = DEBUG_INSERT_MODE_i;
                                         break;
                                     }
                                 }
