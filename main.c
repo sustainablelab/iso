@@ -81,17 +81,6 @@ int main(int argc, char *argv[])
         cS->buff_end[i] = cS->buff_in[i] + (len-1)*sizeof(char);// Point at buff end
         *(cS->buff_c[i]) = '\0';                                // nul-terminate start
     }
-    for (int i=0; i<NUM_CTRLS; i++)
-    { // Initialize text fgnd and bgnd rectangles to zero
-        cS->fg_rect[i].x = dT_margin;
-        cS->fg_rect[i].y = dT_margin;
-        cS->fg_rect[i].w = 0;
-        cS->fg_rect[i].h = 0;
-        cS->bg_rect[i].x = 0;
-        cS->bg_rect[i].y = 0;
-        cS->bg_rect[i].w = 0;
-        cS->bg_rect[i].h = 0;
-    }
 
     // Main debug overlay -- print whatever I want here
     TextBox dTB;                                                // Debug overlay Textbox
@@ -99,7 +88,7 @@ int main(int argc, char *argv[])
     setup_debug_box(&dTB, debug_text_buffer);                   // Init debug overlay
     // Smaller text window on the left to title the controls
     TextBox dCB;                                                // Debug control box
-    char debug_controls[20];                                    // Small debug buffer
+    char debug_controls[32];                                    // Small debug buffer
     setup_debug_box(&dCB, debug_controls);
 
     // Mode
@@ -313,8 +302,8 @@ int main(int argc, char *argv[])
         }
 
         // Render
-        { // Background
-            SDL_SetRenderDrawColor(ren, cS->val[R],cS->val[G],cS->val[B],cS->val[A]);
+        { // Background (bgnd alpha channel has no effect because bgnd is the bottom layer)
+            SDL_SetRenderDrawColor(ren, cS->val[R],cS->val[G],cS->val[B],0);
             SDL_RenderClear(ren);
         }
         if(  show_debug  )
@@ -322,12 +311,12 @@ int main(int argc, char *argv[])
             { // Fill main overlay text buffer with characters
                 char *d = dTB.text;                             // d : see macro "print"
                 print(main_overlay_text);print("\n");
-                print("NUM_CTRLS: "); printint(2,NUM_CTRLS); print("\n");
+                /* print("NUM_CTRLS: "); printint(2,NUM_CTRLS); print("\n"); */
             }
             { // Fill debug control title text buffer with characters
                 char *d = dCB.text;                             // d : see macro "print"
-                print("Control\n");
-                print("-------\n");
+                print("Controls ("); printint(3,NUM_CTRLS);print(")\n");
+                print("------------\n");
             }
             for(int i=0; i<NUM_CTRLS; i++)
             { // Fill control text buffers with characters
@@ -349,10 +338,18 @@ int main(int argc, char *argv[])
             }
             for(int i=0; i<NUM_CTRLS; i++)
             { // Draw the control text inputs to their textures
+                SDL_Color text_color = dT_normal_color;         // Set text color to normal
+                if(  mode == DEBUG_INSERT_MODE  )               // But if in insert mode
+                {
+                    if(  cS->focus[i]  )                        // And in focus
+                    {
+                        text_color = dT_insert_color;           // use insert color
+                    }
+                }
                 SDL_Surface *surf = TTF_RenderText_Blended_Wrapped(
                         debug_font,
                         cS->text[i],                            // Text buffer to render
-                        dT_color,                               // Text color
+                        text_color,                             // Text color
                         0);                                     // Wrap on new lines
                 cS->tex[i] = SDL_CreateTextureFromSurface(ren, surf);
                 SDL_FreeSurface(surf);
@@ -360,6 +357,7 @@ int main(int argc, char *argv[])
                                     &(cS->fg_rect[i].w),        // Get text width
                                     &(cS->fg_rect[i].h));       // Get text height
                 // Slide text down based on index
+                cS->fg_rect[i].x = dT_margin;
                 cS->fg_rect[i].y = dT_margin + dCB.bg_rect.h + i*(cS->fg_rect[i].h);
                 cS->bg_rect[i].y = cS->fg_rect[i].y;
                 cS->bg_rect[i].h = cS->fg_rect[i].h;            // Fit text height
@@ -385,7 +383,7 @@ int main(int argc, char *argv[])
                 { // Get height of tallest text
                     int t = dTB.fg_rect.h;
                     /* int c = dCB.fg_rect.h; */
-                    int c = dCB.fg_rect.h + 4*(cS->fg_rect[R].h);
+                    int c = dCB.fg_rect.h + 4*(cS->fg_rect[0].h);
                     tallest = (t > c) ? t : c;
                 }
                 SDL_Rect bg_rect = {.x=0, .y=0, .w=wI.w, .h=(tallest + 2*dTB.margin)};
@@ -430,7 +428,6 @@ int main(int argc, char *argv[])
             }
         }
         { // Isometric
-
         }
         { // Present to screen
             SDL_RenderPresent(ren);

@@ -20,7 +20,7 @@ typedef struct
 void setup_debug_box(TextBox *tb, char *buffer)
 {
     tb->text = buffer;                                          // Point at text buffer
-    tb->fg = dT_color;                                          // White text
+    tb->fg = dT_normal_color;                                   // White text
     tb->bg = dT_glow;                                           // Green glow when active
     tb->margin = dT_margin;                                     // Space (pix) to win edge
     tb->fg_rect=(SDL_Rect){.x=tb->margin, .y=tb->margin,        // Left/Top edge is margin

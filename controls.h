@@ -4,35 +4,44 @@
 #include <stdbool.h>
 #include <SDL.h>
 
-#define CTRL_TABLE                      \
-    /*    index,label, val, focus  */   \
-        X(R,    "R: ", 128, false)      \
-        X(G,    "G: ", 128, false)      \
-        X(B,    "B: ",   0, false)      \
-        X(A,    "A: ",   0, false)
-
-
-// Preprocessor output: enum ctrl_index { R, G, B, A, };
-#define X(index, label, val, focus) index,
-enum ctrl_index { CTRL_TABLE };
-#undef X
-
-// Preprocessor output: const char *ctrl_label[] = { "R: ", "G: ", "B: ", "A: ", };
-#define X(index, label, val, focus) label,
-const char *ctrl_label[] = { CTRL_TABLE };
-#undef X
-
-// Preprocessor output: int ctrl_val[] = { 128, 128, 0, 0, };
-#define X(index, label, val, focus) val,
-int ctrl_val[] = { CTRL_TABLE };
-#undef X
+// Add a control by adding an entry to this table. That's it.
+#define CTRL_TABLE                          \
+    /*    index,label, val, focus, rect, */ \
+        X(R,    "R: ", 128, false, {0})     \
+        X(G,    "G: ", 128, false, {0})     \
+        X(B,    "B: ",   0, false, {0})     \
+        X(A,    "A: ",   0, false, {0})     \
+        X(X,    "X: ",   0, false, {0})     \
+        X(Y,    "Y: ",   0, false, {0})
 
 // Preprocessor output: _Bool ctrl_focus[] = { 0 , 0 , 0 , 0 , };
-#define X(index, label, val, focus) focus,
+#define X(index, label, val, focus, rect) focus,
 bool ctrl_focus[] = { CTRL_TABLE };
 #undef X
 
 #define NUM_CTRLS (int)(sizeof(ctrl_focus)/sizeof(bool))
+
+// Preprocessor output: enum ctrl_index { R, G, B, A, };
+#define X(index, label, val, focus, rect) index,
+enum ctrl_index { CTRL_TABLE };
+#undef X
+
+// Preprocessor output: const char *ctrl_label[] = { "R: ", "G: ", "B: ", "A: ", };
+#define X(index, label, val, focus, rect) label,
+const char *ctrl_label[] = { CTRL_TABLE };
+#undef X
+
+// Preprocessor output: int ctrl_val[] = { 128, 128, 0, 0, };
+#define X(index, label, val, focus, rect) val,
+int ctrl_val[] = { CTRL_TABLE };
+#undef X
+
+// Zero-initialize x,y,w,h for the fgnd and bgnd text rectangles
+#define X(index, label, val, focus, rect) rect,
+SDL_Rect ctrl_fg_rect[] = { CTRL_TABLE };
+SDL_Rect ctrl_bg_rect[] = { CTRL_TABLE };
+#undef X
+
 
 typedef struct
 {
@@ -45,8 +54,8 @@ typedef struct
     char *buff_c[NUM_CTRLS];                                    // Walk the input buff
     char *buff_end[NUM_CTRLS];                                  // Store where buff ends
     SDL_Texture *tex[NUM_CTRLS];                                // Textures
-    SDL_Rect fg_rect[NUM_CTRLS];                                // Text bounding box
-    SDL_Rect bg_rect[NUM_CTRLS];                                // Text box with margins
+    SDL_Rect *fg_rect;                                          // Text bounding box
+    SDL_Rect *bg_rect;                                          // Text box with margins
     bool *focus;                                                // Has user's focus cS->focus[i]
 } Ctrl_SOA;
 
@@ -55,6 +64,8 @@ void ctrl_load_table(Ctrl_SOA *cS)
     cS->label = ctrl_label;
     cS->val = ctrl_val;
     cS->focus = ctrl_focus;
+    cS->fg_rect = ctrl_fg_rect;
+    cS->bg_rect = ctrl_bg_rect;
 }
 
 void ctrl_has_focus(bool **TheFocus, Ctrl_SOA *cS)
