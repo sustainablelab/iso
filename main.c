@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
                                     mode = GAME_MODE;
                                     dCB.focus = false;
                                     dTB.focus = false;
-                                    for(int i=0; i<NUM_CTRLS; i++) cS->focus[i] = false;
+                                    ctrl_lose_focus(cS);
                                     break;
                                 case DEBUG_INSERT_MODE: case DEBUG_INSERT_MODE_i:
                                     mode = DEBUG_WINDOW_MODE;
@@ -291,16 +291,8 @@ int main(int argc, char *argv[])
                 }
                 SDL_Rect bg_rect = {.x=0, .y=0, .w=wI.w, .h=(tallest + 2*dT_margin)};
                 SDL_RenderFillRect(ren, &bg_rect);              // Draw black bgnd
-                for( int i=0; i<NUM_CTRLS; i++)
-                {
-                    if(  cS->focus[i]  )                        // Glow if in user's focus
-                    {
-                        SDL_SetRenderDrawColor(ren, dT_glow.r, dT_glow.g, dT_glow.b, dT_glow.a);
-                        SDL_RenderDrawRect(ren, &cS->bg_rect[i]);      // Draw green glow box
-                        SDL_SetRenderDrawColor(ren, dT_glow.r, dT_glow.g, dT_glow.b, 100);
-                        SDL_RenderFillRect(ren, &cS->bg_rect[i]);      // Fill green glow box
-                    }
-                }
+                SDL_Color focus_color = dT_glow;
+                ctrl_render_focus(ren, cS, focus_color);
                 if(  dCB.focus  )                               // Glow if in user's focus
                 {
                     SDL_SetRenderDrawColor(ren, dCB.bg.r, dCB.bg.g, dCB.bg.b, dCB.bg.a);
@@ -318,16 +310,9 @@ int main(int argc, char *argv[])
                 // Render text
                 SDL_RenderCopy(ren, dTB.tex, NULL, &dTB.fg_rect);
                 SDL_RenderCopy(ren, dCB.tex, NULL, &dCB.fg_rect);
-                for( int i=0; i<NUM_CTRLS; i++)
-                {
-                    SDL_RenderCopy(ren, cS->tex[i], NULL, &(cS->fg_rect[i]));
-                }
                 SDL_DestroyTexture(dTB.tex);
                 SDL_DestroyTexture(dCB.tex);
-                for( int i=0; i<NUM_CTRLS; i++)
-                {
-                    SDL_DestroyTexture(cS->tex[i]);
-                }
+                ctrl_render_text(ren, cS);
             }
         }
         { // Isometric

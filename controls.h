@@ -171,6 +171,11 @@ void ctrl_who_has_focus(bool **TheFocus, Ctrl_SOA *cS)
     }
 }
 
+void ctrl_lose_focus(Ctrl_SOA *cS)
+{ // Remove focus from all controls
+    for(int i=0; i<NUM_CTRLS; i++) { cS->focus[i] = false; }
+}
+
 int _clamp(int val, int max, int min)
 { // Return clamped value.
     /* *************Check max AND min***************
@@ -380,6 +385,34 @@ void ctrl_make_layout(Ctrl_SOA *cS, int bg_w, int fg_yoffset)
         cS->bg_rect[i].y = cS->fg_rect[i].y;                    // bg y matches text y
         cS->bg_rect[i].h = cS->fg_rect[i].h;                    // bg height fits text
         cS->bg_rect[i].w = bg_w;                                // bg width matches title
+    }
+}
+
+void ctrl_render_focus(SDL_Renderer *ren, Ctrl_SOA *cS, SDL_Color focus_color)
+{ // Render bgnd as drawrect and fillrect to show where focus is
+    Uint8 r = focus_color.r;
+    Uint8 g = focus_color.g;
+    Uint8 b = focus_color.b;
+    Uint8 a = focus_color.a;
+    for( int i=0; i<NUM_CTRLS; i++)
+    {
+        if(  cS->focus[i]  )                                    // Glow if in user's focus
+        {
+            SDL_SetRenderDrawColor(ren, r, g, b, a);            // Set box outline color
+            SDL_RenderDrawRect(ren, &cS->bg_rect[i]);           // Draw green glow box
+            SDL_SetRenderDrawColor(ren, r, g, b, 100);          // Set box fill color
+            SDL_RenderFillRect(ren, &cS->bg_rect[i]);           // Fill green glow box
+            break;
+        }
+    }
+}
+
+void ctrl_render_text(SDL_Renderer *ren, Ctrl_SOA *cS)
+{ // Copy textures to renderer, then destroy textures
+    for( int i=0; i<NUM_CTRLS; i++)
+    {
+        SDL_RenderCopy(ren, cS->tex[i], NULL, &(cS->fg_rect[i]));
+        SDL_DestroyTexture(cS->tex[i]);
     }
 }
 
