@@ -10,54 +10,20 @@
 #include <SDL_ttf.h>
 #include <stdbool.h>
 #include "window_info.h"
-#include "font.h"
-#include "text_box.h"
 #include "print.h"
+#include "font.h"
+#include "debug_text.h"
+#include "text_box.h"
+#include "help.h"
+#include "controls.h"
 
-const char * main_overlay_text = ""
-    "- Press `:` (COLON) to navigate this debug overlay.\n"
-    "  A green highlight appears.\n\n"
-    "  - Press `j,k,h,l` to move this highlight.\n\n"
-    "- Press `i` (insert) to edit the highlighted value (RGBA only).\n"
-    "  - Press `Esc` to leave insert mode.\n"
-    "  - Very limited text editing ability:\n"
-    "    - enter numbers (value is 0 to 255)\n"
-    "    - Backspace to erase\n"
-    "    - Enter to submit value\n"
-    "    - Shift+Enter to submit value and move onto next input\n"
-    "    - Press `Esc` to leave insert mode.\n\n"
-    "- Press `Esc` to leave the highlight mode.\n"
-    "- Press `Esc` again and the game quits.";
-
-
-#define NUM_CTRLS 4
-SDL_Color dT_color = {255,255,255,255};                         // Debug text color
-SDL_Color dT_glow = {128,255,0,200};                            // Debug text focus glow
-int dT_margin = 5;                                              // Debug text margin
-
-enum ctrl_index {R, G, B, A};
-
-typedef struct
-{
-    /* SDL_Color bg;                                              // Control bgnd color */
-    int val[NUM_CTRLS];                                         // Control value
-    // Get the control value from user text input
-    char *text[NUM_CTRLS];                                      // Buffer for all text
-    const char *label[NUM_CTRLS];                               // Text label (ex "R: ")
-    char *buff_in[NUM_CTRLS];                                   // Control text input buff
-    char *buff_c[NUM_CTRLS];                                    // Walk the input buff
-    char *buff_end[NUM_CTRLS];                                  // Store where buff ends
-    SDL_Texture *tex[NUM_CTRLS];                                // Textures
-    SDL_Rect fg_rect[NUM_CTRLS];                                // Text bounding box
-    SDL_Rect bg_rect[NUM_CTRLS];                                // Text box with margins
-    bool focus[NUM_CTRLS];                                      // Has user's focus
-} Ctrl_SOA;
 
 // Singletons
 SDL_Window *win;                                                // The window
 SDL_Renderer *ren;                                              // The renderer
 TTF_Font *debug_font;                                           // Debug overlay font
 Ctrl_SOA *cS;                                                   // Debug controls are SOA
+
 
 void shutdown(void)
 {
@@ -87,17 +53,6 @@ int font_setup(TTF_Font **font)
     return 0;
 }
 
-void setup_debug_box(TextBox *tb, char *buffer)
-{
-    tb->text = buffer;                                          // Point at text buffer
-    tb->fg = dT_color;                                          // White text
-    tb->bg = dT_glow;                                           // Green glow when active
-    tb->margin = dT_margin;                                     // Space (pix) to win edge
-    tb->fg_rect=(SDL_Rect){.x=tb->margin, .y=tb->margin,        // Left/Top edge is margin
-                           .w=0, .h=0};                         // Will size text in loop
-    tb->bg_rect=(SDL_Rect){0};                                  // Will size bgnd in loop
-    tb->focus = false;                                          // Start: not user's focus
-}
 
 int main(int argc, char *argv[])
 {
@@ -116,17 +71,7 @@ int main(int argc, char *argv[])
     bool show_debug = true;                                     // Start debug visible
     Ctrl_SOA controls_in_debug_overlay;                         // Allocate struct mem
     cS = &controls_in_debug_overlay;                            // Point global at struct
-    for (int i=0; i<NUM_CTRLS; i++)
-    {
-        switch(i)
-        {
-            case R: cS->label[i] = "R: "; cS->val[i] = 128; cS->focus[i]=false; break;
-            case G: cS->label[i] = "G: "; cS->val[i] = 128; cS->focus[i]=false; break;
-            case B: cS->label[i] = "B: "; cS->val[i] = 0;   cS->focus[i]=false; break;
-            case A: cS->label[i] = "A: "; cS->val[i] = 0;   cS->focus[i]=false; break;
-            default: break;
-        }
-    }
+    ctrl_load_table(cS);
     for (int i=0; i<NUM_CTRLS; i++)
     { // Create string buffers for control text inputs
         cS->text[i] = malloc(sizeof(char)*8);                   // Entire ctrl: at most 8
@@ -286,10 +231,13 @@ int main(int argc, char *argv[])
                         case SDLK_l:
                             if(  mode == DEBUG_WINDOW_MODE  )
                             {
-                                if(  dCB.focus  )
-                                {
-                                    dCB.focus = false;
-                                    dTB.focus = true;
+                                bool *TheFocus = NULL;           // Who is in focus?
+                                if(  dCB.focus  ) TheFocus = &(dCB.focus);
+                                else ctrl_has_focus(&TheFocus, cS); // Search the controls
+                                if(  TheFocus != NULL  )
+                                { // Found a control with focus
+                                    *TheFocus = false;           // Now they are not in focus
+                                    dTB.focus = true;           // Now this guy is in focus
                                 }
                             }
                             break;
@@ -481,6 +429,9 @@ int main(int argc, char *argv[])
                     SDL_DestroyTexture(cS->tex[i]);
                 }
             }
+        }
+        { // Isometric
+
         }
         { // Present to screen
             SDL_RenderPresent(ren);
