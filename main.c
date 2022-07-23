@@ -1,6 +1,6 @@
 /* *************TODO***************
- * 1. Add a cursor and give it navigation inside the text
- * 2. Isometric mapping!
+ * 1. Isometric mapping!
+ * 2. Add a cursor and give it navigation inside the text
  * *******************************/
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -300,7 +300,7 @@ int main(int argc, char *argv[])
 
         // Render
         { // Background (bgnd alpha channel has no effect because bgnd is the bottom layer)
-            SDL_SetRenderDrawColor(ren, cS->val[R],cS->val[G],cS->val[B],0);
+            SDL_SetRenderDrawColor(ren, 20,15,40,0);            // Dark blue-purple
             SDL_RenderClear(ren);
         }
         if(  show_debug  )
@@ -309,6 +309,7 @@ int main(int argc, char *argv[])
                 char *d = dTB.text;                             // d : see macro "print"
                 print(main_overlay_text);print("\n");
                 /* print("NUM_CTRLS: "); printint(2,NUM_CTRLS); print("\n"); */
+                print("Win: "); printint(4,wI.w); print("x"); printint(4,wI.h); print("\n");
             }
             { // Fill debug control title text buffer with characters
                 char *d = dCB.text;                             // d : see macro "print"
@@ -429,6 +430,8 @@ int main(int argc, char *argv[])
             }
         }
         { // Isometric
+            SDL_SetRenderDrawColor(ren, cS->val[R],cS->val[G],cS->val[B],cS->val[A]);
+            SDL_RenderDrawLine(ren, cS->val[X1], cS->val[Y1], cS->val[X2], cS->val[Y2]);
         }
         { // Present to screen
             SDL_RenderPresent(ren);

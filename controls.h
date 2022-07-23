@@ -6,13 +6,15 @@
 
 // Add a control by adding an entry to this table. That's it.
 #define CTRL_TABLE              \
-    /*    index,label, val  */  \
-        X(  R,  "R: ", 128)     \
-        X(  G,  "G: ", 128)     \
-        X(  B,  "B: ",   0)     \
-        X(  A,  "A: ",   0)     \
-        X(  X,  "X: ",   0)     \
-        X(  Y,  "Y: ",   0)
+    /*    index,label,  val  */ \
+        X(  R,  "R: ",  200)    \
+        X(  G,  "G: ",  130)    \
+        X(  B,  "B: ",    0)    \
+        X(  A,  "A: ",  255)    \
+        X( X1,  "X1: ", 100)    \
+        X( Y1,  "Y1: ", 350)    \
+        X( X2,  "X2: ", 200)    \
+        X( Y2,  "Y2: ", 250)
 
 // Preprocessor output:
 // enum controls_index { R, G, B, A, X, Y};
