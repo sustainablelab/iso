@@ -26,6 +26,21 @@ SDL_Renderer *ren;                                              // The renderer
 TTF_Font *debug_font;                                           // Debug overlay font
 Ctrl_SOA *cS;                                                   // Debug controls are SOA
 
+#define MODE_TABLE                                                                        \
+    /* index */                                                                           \
+    X( GAME_MODE,          "Esc to quit"            )/* No controls have focus          */\
+    X( DEBUG_WINDOW_MODE,  "Esc to GAME mode"       )/* Normal mode: focus is visible   */\
+    X( DEBUG_INSERT_MODE_i,""                       )/* Swallow `i` keypress for insert */\
+    X( DEBUG_INSERT_MODE,  "Esc to exit INSERT mode")/* Actual insert mode              */
+
+#define X(index, help) index,
+enum mode_index { MODE_TABLE };
+#undef X
+
+#define X(index, help) #index " ("help")",
+const char *mode_labels[]  = { MODE_TABLE };
+#undef X
+
 void shutdown(void)
 {
     ctrl_free(cS);
@@ -50,6 +65,7 @@ int main(int argc, char *argv[])
     if(  font_setup(&debug_font) < 0  ) return EXIT_FAILURE;    // Init TTF and load font
 
     // Game state
+    enum mode_index mode = GAME_MODE;                           // Be modal
     bool quit = false;
     bool show_debug = true;                                     // Start debug visible
     bool show_help = false;                                     // Start with help hidden
@@ -70,26 +86,12 @@ int main(int argc, char *argv[])
     char debug_controls[32];                                    // Small debug buffer
     setup_debug_box(&dCB, debug_controls);
 
-    // Mode
-    enum {
-        GAME_MODE,                                              // Just reading overlay (if vis)
-        DEBUG_WINDOW_MODE,                                      // Normal mode: move focus
-        DEBUG_INSERT_MODE_i,                                    // Swallow `i` for insert
-        DEBUG_INSERT_MODE,                                      // Actual insert mode
-        } mode = GAME_MODE;                                     // Be modal
-
     // Game loop
     while(  quit == false  )
     {
         // Update state
         SDL_GetWindowSize(win, &wI.w, &wI.h);                   // Adapt to window resize
         dTB.bg_rect.w = wI.w - dCB.bg_rect.w;                   // w : main debug text
-        switch(mode)
-        {
-            case GAME_MODE: break;
-            case DEBUG_WINDOW_MODE: break;
-            default: break;
-        }
 
         // UI
         SDL_Keymod kmod = SDL_GetModState();                    // kmod : OR'd modifiers
@@ -225,8 +227,10 @@ int main(int argc, char *argv[])
         { // Debug overlay
             { // Fill main overlay text buffer with characters
                 char *d = dTB.text;                             // d : see macro "print"
-                print("Win: "); printint(4,wI.w); print("x"); printint(4,wI.h); print("\n");
+                print("Win: "); printint(4,wI.w); print("x"); printint(4,wI.h); print("  ");
+                print(mode_labels[mode]);
                 /* print("NUM_CTRLS: "); printint(2,NUM_CTRLS); print("\n"); */
+                print("\n");
                 if(  show_help  ) { print(help_text); }
                 else { print(hint_text); }
             }
