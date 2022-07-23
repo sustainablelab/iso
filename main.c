@@ -98,10 +98,10 @@ int main(int argc, char *argv[])
         { // Filtered (rapid fire keys)
             SDL_PumpEvents();
             const Uint8 *k = SDL_GetKeyboardState(NULL);        // Get all keys
-            if(  !(kmod & KMOD_SHIFT)  )         // Shift : ignore arrows
+            if(  !(kmod & KMOD_SHIFT)  )                        // Shift : ignore arrows
             {
-                if(  k[SDL_SCANCODE_UP]  ) { ctrl_inc(cS); }    // Up Arrow : inc val
-                if(  k[SDL_SCANCODE_DOWN]  ) { ctrl_dec(cS); }  // Dn Arrow : dec val
+                if(  k[SDL_SCANCODE_UP]  ) { ctrl_inc(cS, 1); }    // Up Arrow : inc val
+                if(  k[SDL_SCANCODE_DOWN]  ) { ctrl_dec(cS, 1); }  // Dn Arrow : dec val
                 if(  k[SDL_SCANCODE_UP] || k[SDL_SCANCODE_DOWN]  ) // Handle mode logic
                 {
                     if(  mode == DEBUG_INSERT_MODE  ) { mode = DEBUG_WINDOW_MODE; }
@@ -123,6 +123,12 @@ int main(int argc, char *argv[])
                     {
                         case SDLK_SLASH:                        // ? : Toggle help
                             if(  kmod & KMOD_SHIFT  ) { show_help = !show_help; }
+                            break;
+                        case SDLK_UP:
+                            if(  kmod & KMOD_SHIFT  ) { ctrl_inc(cS, 10); }
+                            break;
+                        case SDLK_DOWN:
+                            if(  kmod & KMOD_SHIFT  ) { ctrl_dec(cS, 10); }
                             break;
                         case SDLK_BACKSPACE:                    // Back : del last char
                             if(  mode == DEBUG_INSERT_MODE  ) { ctrl_buff_del(cS); }

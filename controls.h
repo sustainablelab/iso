@@ -195,26 +195,26 @@ int _clamp(int val, int max, int min)
     return val;
 }
 
-void ctrl_inc(Ctrl_SOA *cS)
+void ctrl_inc(Ctrl_SOA *cS, int amt)
 {
     for( int i=0; i<NUM_CTRLS; i++ )
     {
         if(  cS->focus[i]  )
         {
-            cS->val[i]++;
+            cS->val[i] += amt;
             cS->val[i] = _clamp(cS->val[i], cS->max_val[i], cS->min_val[i]);
             break;
         }
     }
 }
 
-void ctrl_dec(Ctrl_SOA *cS)
+void ctrl_dec(Ctrl_SOA *cS, int amt)
 {
     for( int i=0; i<NUM_CTRLS; i++ )
     {
         if(  cS->focus[i]  )
         {
-            cS->val[i]--;
+            cS->val[i] -= amt;
             cS->val[i] = _clamp(cS->val[i], cS->max_val[i], cS->min_val[i]);
             break;
         }
