@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
     bool show_help = false;                                     // Start with help hidden
     Ctrl_SOA controls_in_debug_overlay;                         // Allocate struct mem
     cS = &controls_in_debug_overlay;                            // Point global at struct
-    ctrl_load_table(cS);
+    ctrl_load_table(cS, dT_margin);
     { // Overwrite X,Y max values with window size
         cS->max_val[X1] = wI.w; cS->max_val[Y1] = wI.h;
         cS->max_val[X2] = wI.w; cS->max_val[Y2] = wI.h;
@@ -253,31 +253,18 @@ int main(int argc, char *argv[])
                 dCB.bg_rect.h = dCB.fg_rect.h + 2*dCB.margin;   // Extend bgnd below text
                 dCB.bg_rect.w = dCB.fg_rect.w + 2*dCB.margin;   // Box around text
             }
-            for(int i=0; i<NUM_CTRLS; i++)
             { // Draw the control text inputs to their textures
-                SDL_Color text_color = dT_normal_color;         // Set text color to normal
-                if(  mode == DEBUG_INSERT_MODE  )               // But if in insert mode
-                {
-                    if(  cS->focus[i]  )                        // And in focus
-                    {
-                        text_color = dT_insert_color;           // use insert color
-                    }
-                }
-                SDL_Surface *surf = TTF_RenderText_Blended_Wrapped(
-                        debug_font,
-                        cS->text[i],                            // Text buffer to render
-                        text_color,                             // Text color
-                        0);                                     // Wrap on new lines
-                cS->tex[i] = SDL_CreateTextureFromSurface(ren, surf);
-                SDL_FreeSurface(surf);
-                SDL_QueryTexture(cS->tex[i], NULL, NULL,
-                                    &(cS->fg_rect[i].w),        // Get text width
-                                    &(cS->fg_rect[i].h));       // Get text height
-                // Slide text down based on index
-                cS->fg_rect[i].y = dT_margin + dCB.bg_rect.h + i*(cS->fg_rect[i].h);
-                cS->bg_rect[i].y = cS->fg_rect[i].y;
-                cS->bg_rect[i].h = cS->fg_rect[i].h;            // Fit text height
-                cS->bg_rect[i].w = dCB.bg_rect.w;               // Match title width
+
+                // Draw text to texture
+                SDL_Color insert_color = dT_normal_color;       // All text is normal color
+                if(  mode == DEBUG_INSERT_MODE  )               // But in insert mode,
+                { insert_color = dT_insert_color; }             // use insert color on focus
+                ctrl_draw_text(ren, cS, debug_font, dT_normal_color, insert_color);
+
+                // Layout text rects
+                int fg_yoffset = dT_margin + dCB.bg_rect.h;     // fg_y for first control
+                int bg_w = dCB.bg_rect.w;                       // bg matches title width
+                ctrl_make_layout(cS, bg_w, fg_yoffset);         // Layout text rects
             }
             { // Draw the main overlay text to the debug overlay texture
                 SDL_Surface *surf = TTF_RenderText_Blended_Wrapped(debug_font,

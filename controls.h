@@ -77,7 +77,7 @@ typedef struct
     bool *focus;                                       // Has user's focus cS->focus[i]
 } Ctrl_SOA;
 
-void ctrl_load_table(Ctrl_SOA *cS)
+void ctrl_load_table(Ctrl_SOA *cS, int left_margin)
 {
     { // Static mem stuff
         { // These values are set in the CTRL_TABLE
@@ -87,12 +87,12 @@ void ctrl_load_table(Ctrl_SOA *cS)
             cS->min_val = controls_min_val;                     // Initialized by X Macro
         }
         { // Don't use CTRL_TABLE for these values: unnecessary complexity
-            cS->focus = controls_focus;                         //
+            cS->focus = controls_focus;
             for(int i=0; i<NUM_CTRLS; i++) cS->focus[i] = false;// Initialize to false
             cS->fg_rect = controls_fg_rect;
             for(int i=0; i<NUM_CTRLS; i++)
             { // Zero-init y,w,h (they are later adjusted during rendering)
-                cS->fg_rect[i].x = dT_margin;                   // hardcode x to dT_margin
+                cS->fg_rect[i].x = left_margin;                 // hardcode x to left_margin
                 cS->fg_rect[i].y = 0;
                 cS->fg_rect[i].w = 0;
                 cS->fg_rect[i].h = 0;
@@ -335,6 +335,51 @@ void ctrl_print_input_in_focus(Ctrl_SOA *cS)
             }
             break;
         }
+    }
+}
+
+void ctrl_draw_text(SDL_Renderer *ren,
+                    Ctrl_SOA *cS,
+                    TTF_Font *debug_font,
+                    SDL_Color normal_color,
+                    SDL_Color insert_color)
+{ // Draw each control text on its texture
+    for( int i=0; i<NUM_CTRLS; i++ )
+    {
+        // Caller tests for insert mode, I don't worry about that here
+        SDL_Color text_color = normal_color;                    // Use normal color
+        if(  cS->focus[i]  ) { text_color = insert_color; }     // Use insert color
+        SDL_Surface *surf = TTF_RenderText_Blended_Wrapped(
+                                debug_font,
+                                cS->text[i],                    // Text buffer to render
+                                text_color,                     // Text color
+                                0);                             // Wrap on new lines
+        // Creating the texture determines the fg_rect w and h
+        cS->tex[i] = SDL_CreateTextureFromSurface(ren, surf);
+        SDL_FreeSurface(surf);
+        SDL_QueryTexture(cS->tex[i], NULL, NULL,
+                            &(cS->fg_rect[i].w),        // Get text width
+                            &(cS->fg_rect[i].h));       // Get text height
+    }
+}
+
+void ctrl_make_layout(Ctrl_SOA *cS, int bg_w, int fg_yoffset)
+{ // Write fgnd rect y, and bgnd rect y,w,h
+    /* *************DOC***************
+     * Pass these values:
+     * bg_w : the bgnd width of the title above the controls
+     * fg_yoffset : the height of the title bgnd plus the debug text margin
+     * *******************************/
+    for( int i=0; i<NUM_CTRLS; i++ )
+    {
+        // fg_rect w and h are already set by the texture
+        // Just need to adjust the fg_rect y value
+        cS->fg_rect[i].y = fg_yoffset + i*(cS->fg_rect[i].h);   // y based on index
+        // Copy fg_rect y and height to bg_rect
+        // Match bg_rect width to title above controls
+        cS->bg_rect[i].y = cS->fg_rect[i].y;                    // bg y matches text y
+        cS->bg_rect[i].h = cS->fg_rect[i].h;                    // bg height fits text
+        cS->bg_rect[i].w = bg_w;                                // bg width matches title
     }
 }
 
