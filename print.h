@@ -7,6 +7,7 @@
 #include <stdio.h>
 // c : walk src str
 // d : walk dst str
+// BEWARE: this assumes the dst str is at least as long as the src str
 #define print(str) { const char *c = str; while(*c!='\0'){*d++=*c++;} *d='\0'; }
 #define printint(ndig,val) { char str[ndig+1]; sprintf(str, "%d", val); print(str); }
 

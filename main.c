@@ -1,6 +1,6 @@
 /* *************TODO***************
  * 1. Isometric mapping!
- * 2. Add a cursor and give it navigation inside the text
+ * 2. Add a save to export control values to a file
  * 3. I like my controls:
  *    - just add a line to the CTRL_TABLE and I have a new control
  *    - access the value in the control with cS->val[NAME]
@@ -122,46 +122,15 @@ int main(int argc, char *argv[])
                         case SDLK_SLASH:                        // ? : Toggle help
                             if(  kmod & KMOD_SHIFT  ) { show_help = !show_help; }
                             break;
-                        case SDLK_BACKSPACE:
-                            if(  mode == DEBUG_INSERT_MODE  )
-                            {
-                                for( int i=0; i<NUM_CTRLS; i++ )
-                                {
-                                    if(  cS->focus[i]  )
-                                    {
-                                        cS->buff_c[i]--;
-                                        if(  cS->buff_c[i] < cS->buff_in[i]  ) cS->buff_c[i] = cS->buff_in[i];
-                                        *(cS->buff_c[i]) = '\0';        // nul-terminate string
-                                        break;
-                                    }
-                                }
-                            }
+                        case SDLK_BACKSPACE:                    // Back : del last char
+                            if(  mode == DEBUG_INSERT_MODE  ) { ctrl_buff_del(cS); }
                             break;
-                        case SDLK_RETURN:
+                        case SDLK_RETURN:                       // Enter : use input as val
                             if(  mode == DEBUG_INSERT_MODE  )
-                            {
-                                for( int i=0; i<NUM_CTRLS; i++ )
-                                {
-                                    if(  cS->focus[i]  )
-                                    {
-                                        cS->val[i] = atoi(cS->buff_in[i]);
-                                        break;
-                                    }
-                                }
-                                // Should return take you out of insert mode or not? Nah.
-                                /* mode = DEBUG_WINDOW_MODE;       // Done entering text */
-                                if(  kmod & KMOD_SHIFT  )
-                                {
-                                    for( int i=0; i<NUM_CTRLS-1; i++ )
-                                    {
-                                        if(  cS->focus[i]  )
-                                        {
-                                            cS->focus[i] = false;
-                                            cS->focus[i+1] = true;
-                                            break;
-                                        }
-                                    }
-                                }
+                            { // Hitting Enter doesn't take you out of insert mode
+                                ctrl_enter_val(cS);             // Submit val
+                                // Shift-Enter takes you to next input field
+                                if(  kmod & KMOD_SHIFT  ) { ctrl_focus_next(cS); }
                             }
                             break;
                         case SDLK_ESCAPE:
@@ -195,7 +164,7 @@ int main(int argc, char *argv[])
                             {
                                 bool *TheFocus = NULL;           // Who is in focus?
                                 if(  dCB.focus  ) TheFocus = &(dCB.focus);
-                                else ctrl_has_focus(&TheFocus, cS); // Search the controls
+                                else ctrl_who_has_focus(&TheFocus, cS); // Search the controls
                                 if(  TheFocus != NULL  )
                                 { // Found a control with focus
                                     *TheFocus = false;           // Now they are not in focus
@@ -213,7 +182,7 @@ int main(int argc, char *argv[])
                                 }
                             }
                             break;
-                        case SDLK_j:
+                        case SDLK_j:                            // j : Move focus down
                             if(  mode == DEBUG_WINDOW_MODE  )
                             {
                                 if(  dCB.focus  )
@@ -221,21 +190,10 @@ int main(int argc, char *argv[])
                                     dCB.focus = false;
                                     cS->focus[0] = true;
                                 }
-                                else if(  !(dCB.focus  || dTB.focus)  )
-                                {
-                                    for(int i=0; i<(NUM_CTRLS-1); i++)
-                                    {
-                                        if(  cS->focus[i]  )
-                                        {
-                                            cS->focus[i] = false;
-                                            cS->focus[i+1] = true;
-                                            break;
-                                        }
-                                    }
-                                }
+                                else if(  !(dCB.focus || dTB.focus)  ) { ctrl_focus_next(cS); }
                             }
                             break;
-                        case SDLK_k:
+                        case SDLK_k:                            // k : Move focus up
                             if(  mode == DEBUG_WINDOW_MODE  )
                             {
                                 if(  cS->focus[0]  )
@@ -243,31 +201,13 @@ int main(int argc, char *argv[])
                                     cS->focus[0] = false;
                                     dCB.focus = true;
                                 }
-                                else
-                                {
-                                    for( int i=1; i<NUM_CTRLS; i++ )
-                                    {
-                                        if(  cS->focus[i]  )
-                                        {
-                                            cS->focus[i] = false;
-                                            cS->focus[i-1] = true;
-                                            break;
-                                        }
-                                    }
-                                }
+                                else { ctrl_focus_prev(cS); }
                             }
                             break;
-                        case SDLK_i:
-                            if(  mode == DEBUG_WINDOW_MODE  )
+                        case SDLK_i:                            // i : Enter insert mode
+                            if(  (mode == DEBUG_WINDOW_MODE) && ctrl_has_focus(cS)  )
                             {
-                                for( int i=0; i<NUM_CTRLS; i++)
-                                {
-                                    if(  cS->focus[i]  )
-                                    {
-                                        mode = DEBUG_INSERT_MODE_i;
-                                        break;
-                                    }
-                                }
+                                mode = DEBUG_INSERT_MODE_i;
                             }
                             break;
                         default: break;
@@ -295,15 +235,10 @@ int main(int argc, char *argv[])
                 print("Controls ("); printint(3,NUM_CTRLS);print(")\n");
                 print("------------\n");
             }
-            for(int i=0; i<NUM_CTRLS; i++)
-            { // Fill control text buffers with characters
-                char *d = cS->text[i];                          // d : see macro "print"
-                print(cS->label[i]);
-                if(  cS->focus[i] && (  mode == DEBUG_INSERT_MODE  )  )
-                {
-                    print(cS->buff_in[i]);
-                }
-                else printint(16,cS->val[i]);
+            ctrl_print_val(cS);                                 // Print all the values
+            if(  mode == DEBUG_INSERT_MODE  )                   // If in insert mode
+            { // Print over value with the input buffer of the control in focus
+                ctrl_print_input_in_focus(cS);                  // Print the input buffer
             }
             { // Draw the control title text to its texture
                 SDL_Surface *surf = TTF_RenderText_Blended_Wrapped(debug_font,

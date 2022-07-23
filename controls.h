@@ -43,7 +43,7 @@ const char *controls_label[] = { CTRL_TABLE };
 #define X(index, label, val, max_val, min_val) val,
 int controls_val[] = { CTRL_TABLE };
 #undef X
-#define NUM_CTRLS (int)(sizeof(controls_val)/sizeof(int))
+#define NUM_CTRLS ( (int)(sizeof(controls_val)/sizeof(int)) )
 
 #define X(index, label, val, max_val, min_val) max_val,
 int controls_max_val[] = { CTRL_TABLE };
@@ -66,6 +66,7 @@ typedef struct
     int *min_val;                                      // Control min value cS->min_val[i]
     // Get the control value from user text input
     char *text[NUM_CTRLS];                             // Buffer for all text
+    char *text_end[NUM_CTRLS];                         // Store where text buff ends
     const char **label;                                // Text label (ex "R: ")
     char *buff_in[NUM_CTRLS];                          // Control text input buff
     char *buff_c[NUM_CTRLS];                           // Walk the input buff
@@ -111,7 +112,10 @@ void ctrl_load_table(Ctrl_SOA *cS)
             // Example: "R: 128"
             // - label:             "R: "
             // - user input text:   "128"
-            cS->text[i] = malloc(sizeof(char)*32);              // Entire ctrl: at most 32
+            int text_len = 32;                                  // Max 31 chars plus nul
+            cS->text[i] = malloc(sizeof(char)*text_len);        // Entire ctrl: 32 chars
+            int text_rel_end = (text_len-1)*sizeof(char);       // Relative text buff end
+            cS->text_end[i] = cS->text[i] + text_rel_end;       // Point at text buff end
 
             // buff_in : buffer for user input text
             int len = 8;
@@ -141,7 +145,21 @@ void ctrl_free(Ctrl_SOA *cS)
     }
 }
 
-void ctrl_has_focus(bool **TheFocus, Ctrl_SOA *cS)
+bool ctrl_has_focus(Ctrl_SOA *cS)
+{ // Return true if any control has focus, otherwise false
+    bool has_focus = false;
+    for( int i=0; i<NUM_CTRLS; i++)
+    {
+        if(  cS->focus[i]  )
+        {
+            has_focus = true;
+            break;
+        }
+    }
+    return has_focus;
+}
+
+void ctrl_who_has_focus(bool **TheFocus, Ctrl_SOA *cS)
 { // Point TheFocus at the control that has focus
     for(int i=0; i<NUM_CTRLS; i++)
     {
@@ -153,6 +171,25 @@ void ctrl_has_focus(bool **TheFocus, Ctrl_SOA *cS)
     }
 }
 
+int _clamp(int val, int max, int min)
+{ // Return clamped value.
+    /* *************Check max AND min***************
+     * When incrementing, clamp at max, but also clamp at min!
+     * When decrementing, clamp at min, but also clamp at max!
+     *
+     * Why:
+     * - say user inputs a value way above max
+     * - then presses the down arrow to decrement
+     * - expected behavior: number immediately jumps back in range
+     *
+     * If decrement only checks for clamp at min,
+     * I get undesired behavior: the arrow key decrements this huge value.
+     * *******************************/
+    if (  val > max  ) { return max; }
+    if (  val < min  ) { return min; }
+    return val;
+}
+
 void ctrl_inc(Ctrl_SOA *cS)
 {
     for( int i=0; i<NUM_CTRLS; i++ )
@@ -160,8 +197,7 @@ void ctrl_inc(Ctrl_SOA *cS)
         if(  cS->focus[i]  )
         {
             cS->val[i]++;
-            // Clamp at max
-            if (  cS->val[i] > cS->max_val[i]  ) cS->val[i]=cS->max_val[i];
+            cS->val[i] = _clamp(cS->val[i], cS->max_val[i], cS->min_val[i]);
             break;
         }
     }
@@ -174,8 +210,7 @@ void ctrl_dec(Ctrl_SOA *cS)
         if(  cS->focus[i]  )
         {
             cS->val[i]--;
-            // Clamp at min
-            if (  cS->val[i] < cS->min_val[i]  ) cS->val[i]=cS->min_val[i];
+            cS->val[i] = _clamp(cS->val[i], cS->max_val[i], cS->min_val[i]);
             break;
         }
     }
@@ -194,12 +229,113 @@ void ctrl_buff_in(Ctrl_SOA *cS, const char *c)
         {
             while(  (*c!='\0') && (cS->buff_c[i] < cS->buff_end[i])  )
             { *(cS->buff_c[i])++ = *c++; }
-            if(  cS->buff_c[i] > cS->buff_end[i]  ) cS->buff_c[i] = cS->buff_end[i];
-            *cS->buff_c[i] = '\0';                  // nul-terminate string
+            // TODO: is this check for buff_c > buff_end redundant?
+            if(  cS->buff_c[i] > cS->buff_end[i]  ) { cS->buff_c[i] = cS->buff_end[i]; }
+            *cS->buff_c[i] = '\0';                              // nul-terminate string
             break;
         }
     }
-
-
 }
+
+void ctrl_buff_del(Ctrl_SOA *cS)
+{ // Delete last char from buff_in
+    for( int i=0; i<NUM_CTRLS; i++ )
+    {
+        if(  cS->focus[i]  )
+        {
+            cS->buff_c[i]--;
+            if(  cS->buff_c[i] < cS->buff_in[i]  ) { cS->buff_c[i] = cS->buff_in[i]; }
+            *(cS->buff_c[i]) = '\0';                            // nul-terminate string
+            break;
+        }
+    }
+}
+
+void ctrl_enter_val(Ctrl_SOA *cS)
+{ // Submit buff_in as the new value
+    for( int i=0; i<NUM_CTRLS; i++ )
+    {
+        if(  cS->focus[i]  )
+        {
+            cS->val[i] = atoi(cS->buff_in[i]);
+            break;
+        }
+    }
+}
+
+void ctrl_focus_next(Ctrl_SOA *cS)
+{ // Shift focus to next control
+    for( int i=0; i<NUM_CTRLS-1; i++ )
+    {
+        if(  cS->focus[i]  )
+        {
+            cS->focus[i] = false;
+            cS->focus[i+1] = true;
+            break;
+        }
+    }
+}
+
+void ctrl_focus_prev(Ctrl_SOA *cS)
+{ // Shift focus to previous control
+    for( int i=1; i<NUM_CTRLS; i++ )
+    {
+        if(  cS->focus[i]  )
+        {
+            cS->focus[i] = false;
+            cS->focus[i-1] = true;
+            break;
+        }
+    }
+}
+
+void ctrl_print_val(Ctrl_SOA *cS)
+{ // Print all control values
+    /* *************DOC***************
+     * Print like the print macros in print.h (copies src str to dst str)
+     * but here I safeguard against writing past the end of the dst str.
+     * *******************************/
+    for(int i=0; i<NUM_CTRLS; i++)
+    {
+        char *d = cS->text[i];                                  // Walk the print buffer
+        { // Print label
+            const char *c = cS->label[i];                       // Print this string
+            while(  (*c!='\0') && (d < cS->text_end[i])  ){ *d++=*c++;} *d='\0';
+        }
+        { // Print value
+            // Convert val to a string ... TODO: get rid of sprintf
+            char str[16+1]; sprintf(str, "%d", cS->val[i]);     // Max 16 digits
+            const char *c = str;                                // Print this string
+            while(  (*c!='\0') && (d < cS->text_end[i])  ){ *d++=*c++;} *d='\0';
+        }
+    }
+}
+
+void ctrl_print_input_in_focus(Ctrl_SOA *cS)
+{ // Print the control input buffer that is in focus
+    /* *************DOC***************
+     * Print like the print macros in print.h (copies src str to dst str)
+     * but here I safeguard against writing past the end of the dst str.
+     *
+     * Call ctrl_print_val() first, otherwise it will overwrite this.
+     * This only prints the one control that is in focus.
+     * *******************************/
+    for(int i=0; i<NUM_CTRLS; i++)
+    {
+        if(  cS->focus[i]  )
+        {
+            char *d = cS->text[i];                              // Walk the print buffer
+            { // Print label
+                const char *c = cS->label[i];                   // Print this string
+                while(  (*c!='\0') && (d < cS->text_end[i])  ){ *d++=*c++;} *d='\0';
+            }
+            { // Print input buffer
+                const char *c = cS->buff_in[i];                 // Print this string
+                while(  (*c!='\0') && (d < cS->text_end[i])  ){ *d++=*c++;} *d='\0';
+            }
+            break;
+        }
+    }
+}
+
 #endif // __CONTROLS_H__
