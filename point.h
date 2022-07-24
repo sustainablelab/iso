@@ -1,12 +1,15 @@
-#ifndef __VEC_H__
-#define __VEC_H__
+#ifndef __POINT_H__
+#define __POINT_H__
 
-typedef struct
+#include <SDL.h>
+
+void point_move(SDL_Point *p, SDL_Point offset)
 {
-    int x,y;
-} Vec2;
+    p->x += offset.x;
+    p->y += offset.y;
+}
 
-void vec_map_top_to_iso(Vec2 *p)
+void point_map_top_to_iso(SDL_Point *p)
 { // Change p from top coord to iso coord
     /* *************DOC***************
      * Example:
@@ -15,9 +18,9 @@ void vec_map_top_to_iso(Vec2 *p)
      *      2*-1 = -2 <-- yes
      * y :  x+y = 5 <---- yes
      * *******************************/
-    Vec2 top = {p->x, p->y};
+    SDL_Point top = {p->x, p->y};
     p->x = 2*(top.x - top.y);
     p->y =   (top.x + top.y);
 }
 
-#endif // __VEC_H__
+#endif // __POINT_H__

@@ -18,8 +18,9 @@
 #include "text_box.h"
 #include "help.h"
 #include "controls.h"
-#include "line.h"
-#include "vec.h"
+#include "line.h" // Replace this with vec.h
+#include "vec.h" // Replace this with point.h
+#include "point.h"
 
 
 // Singletons
@@ -27,6 +28,7 @@ SDL_Window *win;                                                // The window
 SDL_Renderer *ren;                                              // The renderer
 TTF_Font *debug_font;                                           // Debug overlay font
 Ctrl_SOA *cS;                                                   // Debug controls are SOA
+SDL_Texture *Tex_top;                                           // Texture for top-view
 
 #define MODE_TABLE                                                                        \
     /* index */                                                                           \
@@ -48,6 +50,7 @@ void shutdown(void)
     ctrl_free(cS);
     TTF_CloseFont(debug_font);
     TTF_Quit();
+    SDL_DestroyTexture(Tex_top);
     SDL_DestroyRenderer(ren);
     SDL_DestroyWindow(win);
     SDL_Quit();
@@ -65,8 +68,34 @@ int main(int argc, char *argv[])
     SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND);       // Draw with alpha
     if(  font_setup(&debug_font) < 0  ) return EXIT_FAILURE;    // Init TTF and load font
 
+    Tex_top = SDL_CreateTexture(ren, SDL_PIXELFORMAT_RGBA8888,
+                                SDL_TEXTUREACCESS_TARGET,
+                                wI.w, wI.h);
+    if(SDL_SetTextureBlendMode(Tex_top, SDL_BLENDMODE_BLEND) < 0) // Draw on transparent bgnd
+    { // Texture blending is not supported
+        puts("Cannot set texture to blendmode blend.");
+        shutdown();
+        return EXIT_FAILURE;
+    }
+    /* if(SDL_SetTextureAlphaMod(Tex_top, 255) < 0)                 // Transparency on transparency */
+    /* { // Cannot use alpha modulation */ 
+    /*     puts("Texture does not support alpha modulation."); */ 
+    /*     shutdown(); */ 
+    /*     return EXIT_FAILURE; */ 
+    /* } */ 
+
     // Game state
     enum mode_index mode = GAME_MODE;                           // Be modal
+    /* bool do_once = true; */
+    /* if(do_once) */
+    /* { */
+    /*     for( int i=0; i<cnt; i++) */
+    /*     { */
+    /*         printf("%s,", has_hatch[i]?"T":"F"); */
+    /*     } */
+    /*     puts("");fflush(stdout); */
+    /*     do_once = false; */
+    /* } */
     bool quit = false;
     bool show_debug = true;                                     // Start debug visible
     bool show_help = false;                                     // Start with help hidden
@@ -107,7 +136,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                if(  !(kmod & KMOD_SHIFT)  )                    // Shift : ignore arrows
+                if(  !(kmod & KMOD_SHIFT) && !(kmod & KMOD_ALT)  )   // Shift/Alt : ignore arrows
                 {
                     if(  k[SDL_SCANCODE_UP]  ) { ctrl_inc(cS, 1); }  // Up Arrow : inc val
                     if(  k[SDL_SCANCODE_DOWN]  ) { ctrl_dec(cS, 1); }// Dn Arrow : dec val
@@ -136,9 +165,11 @@ int main(int argc, char *argv[])
                             break;
                         case SDLK_UP:
                             if(  kmod & KMOD_SHIFT  ) { ctrl_inc(cS, 10); }
+                            if(  kmod & KMOD_ALT    ) { ctrl_inc(cS, 1); }
                             break;
                         case SDLK_DOWN:
                             if(  kmod & KMOD_SHIFT  ) { ctrl_dec(cS, 10); }
+                            if(  kmod & KMOD_ALT    ) { ctrl_dec(cS, 1); }
                             break;
                         case SDLK_BACKSPACE:                    // Back : del last char
                             if(  mode == DEBUG_INSERT_MODE  ) { ctrl_buff_del(cS); }
@@ -362,28 +393,157 @@ int main(int argc, char *argv[])
                 SDL_RenderDrawRect(ren, &origin);
             }
             // Line color for floor
-            SDL_SetRenderDrawColor(ren, 200,130,140,200);
-            // Draw top-down
-            Line v1 = {0,0,0,100};                              // Vertical line
-            Line h1 = {0,0,100,0};                              // Horizontal line
-            // Draw original in ghostly shade on the side
-            SDL_SetRenderDrawColor(ren, 150,60,140,50);         // Line color for ghost
-            Line tv1 = v1; Line th1 = h1;                       // Is this a copy? Yes!
-            Vec2 toffset = {50, cS->val[Y1]};                   // Translate origin 0,0
-            line_move(&tv1, toffset);
-            line_move(&th1, toffset);
-            line_draw(ren, tv1);
-            line_draw(ren, th1);
-            // Map
-            line_map_top_to_iso(&v1);                           // Map coord system
-            line_map_top_to_iso(&h1);                           // Map coord system
-            Vec2 offset = {cS->val[X1], cS->val[Y1]};           // Translate origin 0,0
-            line_move(&v1, offset);                             // Move in screen coord
-            line_move(&h1, offset);                             // Move in screen coord
-            // Render
-            SDL_SetRenderDrawColor(ren, 200,130,140,200);       // Line color for floor
-            line_draw(ren, v1);
-            line_draw(ren, h1);
+            /* SDL_SetRenderDrawColor(ren, 150,120,120,200);       // Line color for floor */
+            /* SDL_SetRenderDrawColor(ren, 170,51,233,174);         // Live purple : path */
+            /* SDL_SetRenderDrawColor(ren,  97,51,233,174);         // Muted purple : vertical lines */
+            if (0)
+            { // Lines
+                // Draw top-down
+                int s = cS->val[S];
+                Line v1 = {0,0,0,100};                              // Vertical line
+                Line v2 = {s,s,s,100};                           // Vertical line
+                Line h1 = {0,0,100,0};                              // Horizontal line
+                Line h2 = {s,s,100,s};                           // Horizontal line
+                // Draw original in ghostly shade on the side
+                SDL_SetRenderDrawColor(ren, 150,60,140,50);         // Line color for ghost
+                Line tv1 = v1; Line th1 = h1;                       // Is this a copy? Yes!
+                Line tv2 = v2; Line th2 = h2;                       // Is this a copy? Yes!
+                Vec2 toffset = {50, cS->val[Y1]};                   // Translate origin 0,0
+                line_move(&tv1, toffset); line_move(&th1, toffset);
+                line_move(&tv2, toffset); line_move(&th2, toffset);
+                line_draw(ren, tv1); line_draw(ren, th1);
+                line_draw(ren, tv2); line_draw(ren, th2);
+                // Map
+                line_map_top_to_iso(&v1); line_map_top_to_iso(&h1); // Map coord system
+                line_map_top_to_iso(&v2); line_map_top_to_iso(&h2); // Map coord system
+                Vec2 offset = {cS->val[X1], cS->val[Y1]};           // Translate origin 0,0
+                line_move(&v1, offset); line_move(&h1, offset);     // Move in screen coord
+                line_move(&v2, offset); line_move(&h2, offset);     // Move in screen coord
+                // Render
+                SDL_SetRenderDrawColor(ren, cS->val[R],cS->val[G],cS->val[B],cS->val[A]);
+                line_draw(ren, v1); line_draw(ren, h1);
+                line_draw(ren, v2); line_draw(ren, h2);
+            }
+            { // Points
+                int s = cS->val[S];
+                SDL_Point points[] = {                          // has_hatch
+                    (SDL_Point){ 0*s, 0*s},                           // false
+                    (SDL_Point){ 0*s, 3*s},                          // true
+                    (SDL_Point){ 1*s, 3*s},                         // false
+                    (SDL_Point){ 1*s, 4*s},                         // false
+                    (SDL_Point){ 0*s, 4*s},                         // false
+                    (SDL_Point){ 0*s,10*s},                         // true
+                    (SDL_Point){ 1*s,10*s},                         // true
+                    (SDL_Point){ 1*s, 5*s},                        // true
+                    (SDL_Point){ 2*s, 5*s},                      // true
+                    (SDL_Point){ 2*s, 2*s},                         // true
+                    (SDL_Point){ 1*s, 2*s},                         // false
+                    (SDL_Point){ 1*s, 1*s},                         // true
+                    (SDL_Point){10*s, 1*s},                         // true
+                    (SDL_Point){10*s, 0*s},                         // true
+                    (SDL_Point){ 0*s, 0*s}                            // false
+                    };
+                int cnt = (int)(sizeof(points)/sizeof(SDL_Point));
+                bool has_hatch[] = {                            // Temporary hack
+                    false,
+                    true,
+                    false,
+                    false,
+                    false,
+                    true,
+                    true,
+                    true,
+                    true,
+                    true,
+                    false,
+                    true,
+                    true,
+                    true,
+                    false,
+                    };
+                if ( 0 )
+                { // Needs work
+                    //If I do figure out how to do it this way, remember to free(has_hatch)
+                    /* free(has_hatch); */
+
+                    /* *************DOC***************
+                     * Argh, the algorithm below works, but
+                     * it only catches points directly above other points
+                     * That is NOT what I need to test for....
+                     * *******************************/
+
+                    // Decide who gets a hatch:
+                    // If multiple points have same x/y ratio, only biggest point gets hatch line
+                    bool *has_hatch = malloc(cnt*sizeof(bool)); // Who has a hatch
+                    for( int i=0; i<(cnt-1); i++) { has_hatch[i] = true; }
+                    for( int i=0; i<(cnt-1); i++)               // -1 because end point is start point
+                    {
+                        int a = points[i].x, b = points[i].y;   // This point
+                        // Turn 0,0 into 1,1, just for this calculation
+                        if(  (a == 0) && (b == 0)  ) { a = 1; b = 1; }
+                        for( int j=0; j<(cnt-1); j++)
+                        { // Compare this point with all others
+                            if(  i!=j  )                        // Don't compare point with itself
+                            {
+                                int c = points[j].x, d = points[j].y;// Another point
+                                // Turn 0,0 into 1,1, just for this calculation
+                                if(  (c==0) && (d==0)  ) { c = 1; d = 1; }
+                                if(  (a*d) == (b*c)  )
+                                { // These points are on the same vertical!
+                                    if(a<c)
+                                    {
+                                        has_hatch[i] = false;   // Do not hatch this point
+                                        break;                  // Done checking this point
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    has_hatch[(cnt-1)] = has_hatch[0];          // because end point is start point
+                }
+                { // Render top-view
+                    // Define region to draw and where to draw it
+                    // src_rect : the portion of Tex_top I want to use
+                    // dst_rect : the scale and location to use Tex_top on the screen
+                    SDL_Rect src_rect = {0};                    // Find box bounding points
+                    SDL_EnclosePoints(points, cnt, NULL, &src_rect);
+                    SDL_Rect dst_rect = src_rect;               // Scale 1 : 1
+                    dst_rect.x = 50; dst_rect.y = cS->val[Y1];  // Put top-view left of iso-view
+                    // Render
+                    SDL_SetRenderTarget(ren, Tex_top);          // Render to this texture
+                    SDL_SetRenderDrawColor(ren, 0,0,0,0);       // Start with blank texture
+                    SDL_RenderClear(ren);
+                    SDL_SetRenderDrawColor(ren, 150,60,140,115);// Line color for ghosted top-view
+                    SDL_RenderDrawLines(ren, points, cnt);      // Connect the dots
+                    SDL_SetRenderTarget(ren, NULL);             // Set renderer back to screen
+                    SDL_RenderCopy(ren, Tex_top, &src_rect, &dst_rect);
+                }
+
+                SDL_Point offset = {cS->val[X1], cS->val[Y1]};  // Translate origin 0,0
+                for( int i=0; i<cnt; i++)
+                {
+                    point_map_top_to_iso(&points[i]);
+                    point_move(&points[i], offset);
+                }
+                SDL_SetRenderDrawColor(ren, 170,51,233,174);         // Live purple : path
+                /* SDL_SetRenderDrawColor(ren,  97,51,233,174);         // Muted purple : vertical lines */
+                /* SDL_SetRenderDrawColor(ren, 150,60,140,115);// Line color for ghosted top-view */
+                SDL_RenderDrawLines(ren, points, cnt);      // Connect the dots
+                { // Hatch lines (drop vertical from each point)
+                    int len = 10; // cS->val[S]*3;
+                    SDL_SetRenderDrawColor(ren,  97,51,233,130);         // Muted purple : vertical lines
+
+                    for( int i=0; i<cnt; i++)
+                    {
+                        if(  has_hatch[i]  )
+                        {
+                            int x = points[i].x; int y = points[i].y;
+                            Line l = {x, y, x, y+len};
+                            line_draw(ren, l);
+                        }
+                    }
+                }
+            }
 
         }
         { // Present to screen

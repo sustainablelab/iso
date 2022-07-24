@@ -1,4 +1,4 @@
-CFLAGS = -Wall -Wextra -pedantic -std=c11
+CFLAGS =  -Wall -Wextra -pedantic -std=c11
 CFLAGS += `pkgconf --cflags sdl2`
 LDLIBS  = `pkgconf --libs sdl2`
 CFLAGS += `pkgconf --cflags sdl2_ttf`

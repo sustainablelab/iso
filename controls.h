@@ -21,11 +21,12 @@
         X(  R,  "R: ",  200,     255,       0)  \
         X(  G,  "G: ",  130,     255,       0)  \
         X(  B,  "B: ",    0,     255,       0)  \
-        X(  A,  "A: ",  255,     255,       0)  \
+        X(  A,  "A: ",   50,     255,       0)  \
         X( X1,  "X1: ", 350,     400,       0)  \
         X( Y1,  "Y1: ", 200,     400,       0)  \
         X( W,   "W: ",   10,     100,       1)  \
-        X( H,   "H: ",   10,     100,       1)
+        X( H,   "H: ",   10,     100,       1)  \
+        X( S,   "S: ",   10,     100,       1)
 
 // Preprocessor output:
 // enum controls_index { R, G, B, A, X, Y};
@@ -134,14 +135,17 @@ void ctrl_load_table(Ctrl_SOA *cS, int left_margin)
 
 void ctrl_free(Ctrl_SOA *cS)
 {
-    for (int i=0; i<NUM_CTRLS; i++)
-    { // Free all string buffers for control text inputs
-        free(cS->text[i]);
-        cS->text[i] = NULL;
-        free(cS->buff_in[i]);
-        cS->buff_in[i] = NULL;
-        cS->buff_c[i] = NULL;
-        cS->buff_end[i] = NULL;
+    if( cS != NULL)
+    {
+        for (int i=0; i<NUM_CTRLS; i++)
+        { // Free all string buffers for control text inputs
+            free(cS->text[i]);
+            cS->text[i] = NULL;
+            free(cS->buff_in[i]);
+            cS->buff_in[i] = NULL;
+            cS->buff_c[i] = NULL;
+            cS->buff_end[i] = NULL;
+        }
     }
 }
 
