@@ -396,34 +396,6 @@ int main(int argc, char *argv[])
             /* SDL_SetRenderDrawColor(ren, 150,120,120,200);       // Line color for floor */
             /* SDL_SetRenderDrawColor(ren, 170,51,233,174);         // Live purple : path */
             /* SDL_SetRenderDrawColor(ren,  97,51,233,174);         // Muted purple : vertical lines */
-            if (0)
-            { // Lines
-                // Draw top-down
-                int s = cS->val[S];
-                Line v1 = {0,0,0,100};                              // Vertical line
-                Line v2 = {s,s,s,100};                           // Vertical line
-                Line h1 = {0,0,100,0};                              // Horizontal line
-                Line h2 = {s,s,100,s};                           // Horizontal line
-                // Draw original in ghostly shade on the side
-                SDL_SetRenderDrawColor(ren, 150,60,140,50);         // Line color for ghost
-                Line tv1 = v1; Line th1 = h1;                       // Is this a copy? Yes!
-                Line tv2 = v2; Line th2 = h2;                       // Is this a copy? Yes!
-                Vec2 toffset = {50, cS->val[Y1]};                   // Translate origin 0,0
-                line_move(&tv1, toffset); line_move(&th1, toffset);
-                line_move(&tv2, toffset); line_move(&th2, toffset);
-                line_draw(ren, tv1); line_draw(ren, th1);
-                line_draw(ren, tv2); line_draw(ren, th2);
-                // Map
-                line_map_top_to_iso(&v1); line_map_top_to_iso(&h1); // Map coord system
-                line_map_top_to_iso(&v2); line_map_top_to_iso(&h2); // Map coord system
-                Vec2 offset = {cS->val[X1], cS->val[Y1]};           // Translate origin 0,0
-                line_move(&v1, offset); line_move(&h1, offset);     // Move in screen coord
-                line_move(&v2, offset); line_move(&h2, offset);     // Move in screen coord
-                // Render
-                SDL_SetRenderDrawColor(ren, cS->val[R],cS->val[G],cS->val[B],cS->val[A]);
-                line_draw(ren, v1); line_draw(ren, h1);
-                line_draw(ren, v2); line_draw(ren, h2);
-            }
             { // Points
                 int s = cS->val[S];
                 SDL_Point points[] = {                          // has_hatch
