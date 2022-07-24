@@ -18,6 +18,8 @@
 #include "text_box.h"
 #include "help.h"
 #include "controls.h"
+#include "line.h"
+#include "vec.h"
 
 
 // Singletons
@@ -51,7 +53,6 @@ void shutdown(void)
     SDL_Quit();
 }
 
-
 int main(int argc, char *argv[])
 {
     // Setup
@@ -74,7 +75,6 @@ int main(int argc, char *argv[])
     ctrl_load_table(cS, dT_margin);
     { // Overwrite X,Y max values with window size
         cS->max_val[X1] = wI.w; cS->max_val[Y1] = wI.h;
-        cS->max_val[X2] = wI.w; cS->max_val[Y2] = wI.h;
     }
 
     // Main debug overlay -- print whatever I want here
@@ -98,13 +98,23 @@ int main(int argc, char *argv[])
         { // Filtered (rapid fire keys)
             SDL_PumpEvents();
             const Uint8 *k = SDL_GetKeyboardState(NULL);        // Get all keys
-            if(  !(kmod & KMOD_SHIFT)  )                        // Shift : ignore arrows
+            if(  mode == GAME_MODE  )
             {
-                if(  k[SDL_SCANCODE_UP]  ) { ctrl_inc(cS, 1); }    // Up Arrow : inc val
-                if(  k[SDL_SCANCODE_DOWN]  ) { ctrl_dec(cS, 1); }  // Dn Arrow : dec val
-                if(  k[SDL_SCANCODE_UP] || k[SDL_SCANCODE_DOWN]  ) // Handle mode logic
+                if(  k[SDL_SCANCODE_UP]  )   { cS->val[Y1]--; }
+                if(  k[SDL_SCANCODE_DOWN]  ) { cS->val[Y1]++; }
+                if(  k[SDL_SCANCODE_LEFT]  ) { cS->val[X1]--; }
+                if(  k[SDL_SCANCODE_RIGHT]  ){ cS->val[X1]++; }
+            }
+            else
+            {
+                if(  !(kmod & KMOD_SHIFT)  )                    // Shift : ignore arrows
                 {
-                    if(  mode == DEBUG_INSERT_MODE  ) { mode = DEBUG_WINDOW_MODE; }
+                    if(  k[SDL_SCANCODE_UP]  ) { ctrl_inc(cS, 1); }  // Up Arrow : inc val
+                    if(  k[SDL_SCANCODE_DOWN]  ) { ctrl_dec(cS, 1); }// Dn Arrow : dec val
+                    if(  k[SDL_SCANCODE_UP] || k[SDL_SCANCODE_DOWN]  )
+                    { // Handle mode logic
+                        if(  mode == DEBUG_INSERT_MODE  ) { mode = DEBUG_WINDOW_MODE; }
+                    }
                 }
             }
         }
@@ -245,10 +255,12 @@ int main(int argc, char *argv[])
                 print("Controls ("); printint(3,NUM_CTRLS);print(")\n");
                 print("------------\n");
             }
-            ctrl_print_val(cS);                                 // Print all the values
-            if(  mode == DEBUG_INSERT_MODE  )                   // If in insert mode
-            { // Print over value with the input buffer of the control in focus
-                ctrl_print_input_in_focus(cS);                  // Print the input buffer
+            { // Fill controls with text: labels and either values or text input buffer
+                ctrl_print_val(cS);                                 // Print all the values
+                if(  mode == DEBUG_INSERT_MODE  )                   // If in insert mode
+                { // Print over value with the input buffer of the control in focus
+                    ctrl_print_input_in_focus(cS);                  // Print the input buffer
+                }
             }
             { // Draw the control title text to its texture
                 SDL_Surface *surf = TTF_RenderText_Blended_Wrapped(debug_font,
@@ -326,8 +338,53 @@ int main(int argc, char *argv[])
             }
         }
         { // Isometric
-            SDL_SetRenderDrawColor(ren, cS->val[R],cS->val[G],cS->val[B],cS->val[A]);
-            SDL_RenderDrawLine(ren, cS->val[X1], cS->val[Y1], cS->val[X2], cS->val[Y2]);
+            /* *************ISO***************
+             * Draw a simple L-shaped platform
+             *
+             * Represent it top-down -- then map it to iso coordinates
+             * ----------------------   ------------------------------
+             *      0  1  2  3  4  x
+             *      |  |  |  |  |
+             * 0 ── ┌────────────                       0  0
+             *      │                                    /\
+             * 1 ── │  ┌─────────                     1 /  \ 1
+             *      │  │                               /    \
+             * 2 ── │  │                            2 /  /\  \ 2
+             *      │  │                             /  /  \  \
+             * 3 ── │  │                          3 /  /    \  \ 3
+             *      │  │                           /  /      \  \
+             * 4 ── │  │                        4 /  /        \  \ 4
+             * y    │  │                       y /  /          \  \ x
+             * *******************************/
+            { // Draw rect controlled by overlay
+                SDL_SetRenderDrawColor(ren, cS->val[R],cS->val[G],cS->val[B],cS->val[A]);
+                SDL_Rect origin = {cS->val[X1]-cS->val[W]/2, cS->val[Y1]-cS->val[H]/2, cS->val[W], cS->val[H]};
+                SDL_RenderDrawRect(ren, &origin);
+            }
+            // Line color for floor
+            SDL_SetRenderDrawColor(ren, 200,130,140,200);
+            // Draw top-down
+            Line v1 = {0,0,0,100};                              // Vertical line
+            Line h1 = {0,0,100,0};                              // Horizontal line
+            // Draw original in ghostly shade on the side
+            SDL_SetRenderDrawColor(ren, 150,60,140,50);         // Line color for ghost
+            Line tv1 = v1; Line th1 = h1;                       // Is this a copy? Yes!
+            Vec2 toffset = {50, cS->val[Y1]};                   // Translate origin 0,0
+            line_move(&tv1, toffset);
+            line_move(&th1, toffset);
+            line_draw(ren, tv1);
+            line_draw(ren, th1);
+            // Map
+            line_map_top_to_iso(&v1);                           // Map coord system
+            line_map_top_to_iso(&h1);                           // Map coord system
+            Vec2 offset = {cS->val[X1], cS->val[Y1]};           // Translate origin 0,0
+            line_move(&v1, offset);                             // Move in screen coord
+            line_move(&h1, offset);                             // Move in screen coord
+            // Render
+            SDL_SetRenderDrawColor(ren, 200,130,140,200);       // Line color for floor
+            line_draw(ren, v1);
+            line_draw(ren, h1);
+
         }
         { // Present to screen
             SDL_RenderPresent(ren);
