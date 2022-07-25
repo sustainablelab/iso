@@ -21,6 +21,7 @@
 #include "line.h" // Replace this with vec.h
 #include "vec.h" // Replace this with point.h
 #include "point.h"
+#include "aff.h"
 
 
 // Singletons
@@ -29,6 +30,13 @@ SDL_Renderer *ren;                                              // The renderer
 TTF_Font *debug_font;                                           // Debug overlay font
 Ctrl_SOA *cS;                                                   // Debug controls are SOA
 SDL_Texture *Tex_top;                                           // Texture for top-view
+
+SDL_Rect SDL_RECT;                                              // Print some rect
+SDL_FRect SDL_FRECT;                                            // Print some float rect
+SDL_FPoint SDL_FPOINT;                                          // Print some float point
+int INT, INT2;                                                  // Print some ints
+AffSeg AFFSEG;                                                  // Print some line seg
+AffLine AFFLINE_I, AFFLINE_J;                                   // Print some lines
 
 #define MODE_TABLE                                                                        \
     /* index */                                                                           \
@@ -127,16 +135,16 @@ int main(int argc, char *argv[])
         { // Filtered (rapid fire keys)
             SDL_PumpEvents();
             const Uint8 *k = SDL_GetKeyboardState(NULL);        // Get all keys
-            if(  mode == GAME_MODE  )
+            if(  !(kmod & KMOD_SHIFT) && !(kmod & KMOD_ALT)  )   // Shift/Alt : ignore arrows
             {
-                if(  k[SDL_SCANCODE_UP]  )   { cS->val[Y1]--; }
-                if(  k[SDL_SCANCODE_DOWN]  ) { cS->val[Y1]++; }
-                if(  k[SDL_SCANCODE_LEFT]  ) { cS->val[X1]--; }
-                if(  k[SDL_SCANCODE_RIGHT]  ){ cS->val[X1]++; }
-            }
-            else
-            {
-                if(  !(kmod & KMOD_SHIFT) && !(kmod & KMOD_ALT)  )   // Shift/Alt : ignore arrows
+                if(  mode == GAME_MODE  )
+                {
+                    if(  k[SDL_SCANCODE_UP]  )   { cS->val[Y1]--; }
+                    if(  k[SDL_SCANCODE_DOWN]  ) { cS->val[Y1]++; }
+                    if(  k[SDL_SCANCODE_LEFT]  ) { cS->val[X1]--; }
+                    if(  k[SDL_SCANCODE_RIGHT]  ){ cS->val[X1]++; }
+                }
+                else
                 {
                     if(  k[SDL_SCANCODE_UP]  ) { ctrl_inc(cS, 1); }  // Up Arrow : inc val
                     if(  k[SDL_SCANCODE_DOWN]  ) { ctrl_dec(cS, 1); }// Dn Arrow : dec val
@@ -162,6 +170,30 @@ int main(int argc, char *argv[])
                     {
                         case SDLK_SLASH:                        // ? : Toggle help
                             if(  kmod & KMOD_SHIFT  ) { show_help = !show_help; }
+                            break;
+                        case SDLK_LEFT:
+                            if(  kmod & KMOD_ALT  )
+                            {
+                                cS->val[I]--;
+                                if (cS->val[I]<0) { cS->val[I] = 0; }
+                            }
+                            if(  kmod & KMOD_SHIFT  )
+                            {
+                                cS->val[J]--;
+                                if (cS->val[J]<0) { cS->val[J] = 0; }
+                            }
+                            break;
+                        case SDLK_RIGHT:
+                            if(  kmod & KMOD_ALT  )
+                            {
+                                cS->val[I]++;
+                                if (cS->val[I]>cS->max_val[I]) { cS->val[I] = cS->max_val[I]; }
+                            }
+                            if(  kmod & KMOD_SHIFT  )
+                            {
+                                cS->val[J]++;
+                                if (cS->val[J]>cS->max_val[J]) { cS->val[J] = cS->max_val[J]; }
+                            }
                             break;
                         case SDLK_UP:
                             if(  kmod & KMOD_SHIFT  ) { ctrl_inc(cS, 10); }
@@ -278,6 +310,47 @@ int main(int argc, char *argv[])
                 print(mode_labels[mode]);
                 /* print("NUM_CTRLS: "); printint(2,NUM_CTRLS); print("\n"); */
                 print("\n");
+                if(0)
+                { // SDL_FRECT
+                    print("EncloseFPoints fr: {");
+                    printfloat(SDL_FRECT.x);print(",");printfloat(SDL_FRECT.y);print(",");
+                    printfloat(SDL_FRECT.w);print(",");printfloat(SDL_FRECT.h);print("}");
+                    print("\n");
+                }
+                { // SDL_RECT
+                    print("Top-view dst_rect: {");
+                    printint(6, SDL_RECT.x);print(",");printint(6, SDL_RECT.y);print(",");
+                    printint(6, SDL_RECT.w);print(",");printint(6, SDL_RECT.h);print("}");
+                    print("\n");
+                }
+                { // SDL_FPOINT
+                    print("Offset fpoint: {");
+                    printfloat(SDL_FPOINT.x);print(",");printfloat(SDL_FPOINT.y);print("}");
+                    print("\n");
+                }
+                if(0)
+                { // INT
+                    print("Points in map: ");printint(4,INT);print("\n");
+                    print("Segs in map: ");  printint(4,INT2);print("\n");
+                }
+                { // AFFSEG
+                    float ax = AFFSEG.A.x; float ay = AFFSEG.A.y;
+                    float bx = AFFSEG.B.x; float by = AFFSEG.B.y;
+                    print("Seg path_border[");printint(4,cS->val[I]);print("]: ");
+                    print("A(");    printfloat(ax);print(",");printfloat(ay);
+                    print("), B("); printfloat(bx);print(",");printfloat(by);
+                    print(")\n");
+                }
+                { // AFFLINE
+                    float Ia = AFFLINE_I.a; float Ib = AFFLINE_I.b; float Ic = AFFLINE_I.c;
+                    float Ja = AFFLINE_J.a; float Jb = AFFLINE_J.b; float Jc = AFFLINE_J.c;
+                    print("Depth line [I]: ");
+                    printfloat(Ia);print(",");printfloat(Ib);print(",");printfloat(Ic);
+                    print(")\n");
+                    print("Path line [J]: ");
+                    printfloat(Ja);print(",");printfloat(Jb);print(",");printfloat(Jc);
+                    print(")\n");
+                }
                 if(  show_help  ) { print(help_text); }
                 else { print(hint_text); }
             }
@@ -387,134 +460,271 @@ int main(int argc, char *argv[])
              * 4 ── │  │                        4 /  /        \  \ 4
              * y    │  │                       y /  /          \  \ x
              * *******************************/
-            { // Draw rect controlled by overlay
-                SDL_SetRenderDrawColor(ren, cS->val[R],cS->val[G],cS->val[B],cS->val[A]);
-                SDL_Rect origin = {cS->val[X1]-cS->val[W]/2, cS->val[Y1]-cS->val[H]/2, cS->val[W], cS->val[H]};
-                SDL_RenderDrawRect(ren, &origin);
-            }
             // Line color for floor
             /* SDL_SetRenderDrawColor(ren, 150,120,120,200);       // Line color for floor */
             /* SDL_SetRenderDrawColor(ren, 170,51,233,174);         // Live purple : path */
             /* SDL_SetRenderDrawColor(ren,  97,51,233,174);         // Muted purple : vertical lines */
             { // Points
-                int s = cS->val[S];
-                SDL_Point points[] = {                          // has_hatch
-                    (SDL_Point){ 0*s, 0*s},                           // false
-                    (SDL_Point){ 0*s, 3*s},                          // true
-                    (SDL_Point){ 1*s, 3*s},                         // false
-                    (SDL_Point){ 1*s, 4*s},                         // false
-                    (SDL_Point){ 0*s, 4*s},                         // false
-                    (SDL_Point){ 0*s,10*s},                         // true
-                    (SDL_Point){ 1*s,10*s},                         // true
-                    (SDL_Point){ 1*s, 5*s},                        // true
-                    (SDL_Point){ 2*s, 5*s},                      // true
-                    (SDL_Point){ 2*s, 2*s},                         // true
-                    (SDL_Point){ 1*s, 2*s},                         // false
-                    (SDL_Point){ 1*s, 1*s},                         // true
-                    (SDL_Point){10*s, 1*s},                         // true
-                    (SDL_Point){10*s, 0*s},                         // true
-                    (SDL_Point){ 0*s, 0*s}                            // false
-                    };
-                int cnt = (int)(sizeof(points)/sizeof(SDL_Point));
-                bool has_hatch[] = {                            // Temporary hack
-                    false,
-                    true,
-                    false,
-                    false,
-                    false,
-                    true,
-                    true,
-                    true,
-                    true,
-                    true,
-                    false,
-                    true,
-                    true,
-                    true,
-                    false,
-                    };
-                if ( 0 )
-                { // Needs work
-                    //If I do figure out how to do it this way, remember to free(has_hatch)
-                    /* free(has_hatch); */
+                SDL_FPoint offset = {cS->val[X1], cS->val[Y1]};  // Translate origin 0,0
+                SDL_FPOINT.x = offset.x; SDL_FPOINT.y = offset.y;
 
-                    /* *************DOC***************
-                     * Argh, the algorithm below works, but
-                     * it only catches points directly above other points
-                     * That is NOT what I need to test for....
-                     * *******************************/
+                float s = (float)cS->val[S];
+                // Simple shape for debug
+                AffPoint points[] = {
+                    (AffPoint){ 0*s, 0*s},
+                    (AffPoint){ 0*s, 4*s},
+                    (AffPoint){ 4*s, 4*s},
+                    (AffPoint){ 4*s, 0*s},
+                    (AffPoint){ 0*s, 0*s}
+                    };
+                // TODO: switch back to fancier shape
+                /* AffPoint points[] = { */
+                /*     (AffPoint){ 0*s, 0*s}, */
+                /*     (AffPoint){ 0*s, 3*s}, */
+                /*     (AffPoint){ 1*s, 3*s}, */
+                /*     (AffPoint){ 1*s, 4*s}, */
+                /*     (AffPoint){ 0*s, 4*s}, */
+                /*     (AffPoint){ 0*s,10*s}, */
+                /*     (AffPoint){ 1*s,10*s}, */
+                /*     (AffPoint){ 1*s, 5*s}, */
+                /*     (AffPoint){ 2*s, 5*s}, */
+                /*     (AffPoint){ 2*s, 2*s}, */
+                /*     (AffPoint){ 1*s, 2*s}, */
+                /*     (AffPoint){ 1*s, 1*s}, */
+                /*     (AffPoint){10*s, 1*s}, */
+                /*     (AffPoint){10*s, 0*s}, */
+                /*     (AffPoint){ 0*s, 0*s} */
+                /*     }; */
+                int cnt = (int)(sizeof(points)/sizeof(AffPoint));
 
-                    // Decide who gets a hatch:
-                    // If multiple points have same x/y ratio, only biggest point gets hatch line
-                    bool *has_hatch = malloc(cnt*sizeof(bool)); // Who has a hatch
-                    for( int i=0; i<(cnt-1); i++) { has_hatch[i] = true; }
-                    for( int i=0; i<(cnt-1); i++)               // -1 because end point is start point
+                // Define "path border"
+                int cnt_seg = cnt-1;                            // Number of line segments
+                cS->max_val[I] = cnt_seg-1;
+                cS->max_val[J] = cnt_seg-1;
+                AffSeg *path_border = malloc(sizeof(AffSeg)*cnt_seg);
+                { // Define path border
+                    // Go through the points. For each pair of points (A,B):
+                    // make a directed line segment sAB (from A to B)
+                    for(int i=0; i<cnt_seg; i++)
                     {
-                        int a = points[i].x, b = points[i].y;   // This point
-                        // Turn 0,0 into 1,1, just for this calculation
-                        if(  (a == 0) && (b == 0)  ) { a = 1; b = 1; }
-                        for( int j=0; j<(cnt-1); j++)
-                        { // Compare this point with all others
-                            if(  i!=j  )                        // Don't compare point with itself
-                            {
-                                int c = points[j].x, d = points[j].y;// Another point
-                                // Turn 0,0 into 1,1, just for this calculation
-                                if(  (c==0) && (d==0)  ) { c = 1; d = 1; }
-                                if(  (a*d) == (b*c)  )
-                                { // These points are on the same vertical!
-                                    if(a<c)
+                        path_border[i] = (AffSeg){points[i],points[i+1]};
+                    }
+                AFFSEG = path_border[cS->val[I]];
+                }
+
+                // Vertical depth artwork
+                AffSeg *depth_art = malloc(sizeof(AffSeg)*cnt_seg);
+                int depth = cS->val[D];
+                { // Define vertical depth lines
+                    // Go through the points. For each point A:
+                    // make a directed line segment sAZ (from A to Z)
+                    // Z is a point directly below A by the amount "depth"
+                    for(int i=0; i<cnt_seg; i++)
+                    {
+                        AffPoint A = points[i];
+                        AffPoint Z = {(A.x+depth), (A.y+depth)};    // 45° maps to vertical
+                        depth_art[i] = (AffSeg){A,Z};
+                    }
+                }
+                if(1)
+                { // Clip vertical depth lines where visually obscured by path border
+                    /* *************DOC***************
+                     * Path border is an array of AffSeg.
+                     * Vertical depth artwork is in an array of AffSeg
+                     * For each vertical depth line:
+                     * Does the line intersect any path border segment?
+                     * - Turn both line segments into lines
+                     * - Find where the lines intersect
+                     * - Check if this point lies on the vertical depth line
+                     * - if so, check if this point also lies on the border segment
+                     * - if both are true, then change the second point of the vertical line
+                     *   segment to be this intersection point
+                     * *******************************/
+                    // Make array of lines once to reuse it in the loop
+                    AffLine *path_lines = malloc(sizeof(AffLine)*cnt_seg);
+                    for(int i=0; i<cnt_seg; i++)
+                    {
+                        path_lines[i] = aff_join_of_points(path_border[i].A, path_border[i].B);
+                    }
+                    AffLine *depth_lines = malloc(sizeof(AffLine)*cnt_seg);
+                    for(int i=0; i<cnt_seg; i++)
+                    {
+                        depth_lines[i] = aff_join_of_points(depth_art[i].A, depth_art[i].B);
+                    }
+                    // DEBUG
+                    AFFLINE_I = depth_lines[cS->val[I]];
+                    AFFLINE_J = path_lines[cS->val[J]];
+                    // END DEBUG
+                    // Iterate over the depth art segments
+                    for(int i=0; i<cnt_seg; i++)
+                    {
+                        for(int j=0; j<cnt_seg; j++)
+                        {
+                            // Find intersection with each AffLine in path_lines
+                            AffPoint M = aff_meet_of_lines(depth_lines[i], path_lines[j]); // point of intersection
+                            if(1)
+                            { // DEBUG -- render intersection point
+                                // Draw M in top-view
+                                // src_rect : the portion of Tex_top I want to use
+                                // dst_rect : the scale and location to use Tex_top on the screen
+                                SDL_FRect fr = {0};                         // Find box bounding points
+                                SDL_EncloseFPoints(points, cnt, NULL, &fr);
+                                SDL_Rect src_rect = {(int)fr.x, (int)fr.y, (int)fr.w+depth, (int)fr.h+depth};
+                                SDL_Rect dst_rect = src_rect;               // Scale 1 : 1
+                                dst_rect.x = 50; dst_rect.y = cS->val[Y1];  // Put top-view left of iso-view
+                                // Render
+                                SDL_SetRenderTarget(ren, Tex_top);          // Render to this texture
+                                SDL_SetRenderDrawColor(ren, 0,0,0,0);       // Start with blank texture
+                                SDL_RenderClear(ren);
+                                { // Render M in top
+                                    SDL_SetRenderDrawColor(ren, cS->val[R],0,0,cS->val[A]);
+                                    int x = (int)(M.x); int y = (int)(M.y);
+                                    SDL_Rect origin = {x - 2, y - 2, 4, 4};
+                                    SDL_RenderDrawRect(ren, &origin);
+                                }
+                                SDL_SetRenderTarget(ren, NULL);             // Set renderer back to screen
+                                SDL_RenderCopy(ren, Tex_top, &src_rect, &dst_rect);
+                                // Draw M in iso view
+                                AffPoint isoM = M;              // Copy M
+                                point_fmap_top_to_iso(&isoM);
+                                point_fmove(&isoM,offset);
+                                { // Render isoM in iso
+                                    if(  cS->val[I] == i  )
+                                    {SDL_SetRenderDrawColor(ren, cS->val[R],50,200,cS->val[A]);}
+                                    else if(  cS->val[J] == j  )
+                                    {SDL_SetRenderDrawColor(ren, 0,200,200,cS->val[A]);}
+                                    else
+                                    {SDL_SetRenderDrawColor(ren, 255,255,255,5);}
+                                    int x = (int)(isoM.x); int y = (int)(isoM.y);
+                                    if(  cS->val[I] == i  )
                                     {
-                                        has_hatch[i] = false;   // Do not hatch this point
-                                        break;                  // Done checking this point
+                                        SDL_Rect origin = {x - 4, y - 4, 8, 8};
+                                        SDL_RenderDrawRect(ren, &origin);
                                     }
+                                    else if(  cS->val[J] == j  )
+                                    {
+                                        SDL_Rect origin = {x - 3, y - 3, 6, 6};
+                                        SDL_RenderDrawRect(ren, &origin);
+                                    }
+                                    else
+                                    {
+                                        SDL_Rect origin = {x - 2, y - 2, 4, 4};
+                                        SDL_RenderDrawRect(ren, &origin);
+                                    }
+                                    
+                                }
+                                // END DEBUG
+                            }
+                            // Does this point lie on both line segments?
+                            AffSeg ds = depth_art[i];           // depth seg
+                            AffSeg ps = path_border[j];         // path seg
+                            if(  aff_point_on_seg(M, ps) && aff_point_on_seg(M, ds)  )
+                            { // The border path segment and depth line segment intersect at M
+                                if(1) // TODO: figure out why this is wrong
+                                {
+                                    depth_art[i].B = M;         // Clip depth art at intersection
                                 }
                             }
                         }
                     }
-                    has_hatch[(cnt-1)] = has_hatch[0];          // because end point is start point
+                    free(path_lines);                           // Done with these lines
+                    free(depth_lines);                          // Done with these lines
                 }
+
                 { // Render top-view
                     // Define region to draw and where to draw it
                     // src_rect : the portion of Tex_top I want to use
                     // dst_rect : the scale and location to use Tex_top on the screen
-                    SDL_Rect src_rect = {0};                    // Find box bounding points
-                    SDL_EnclosePoints(points, cnt, NULL, &src_rect);
+                    SDL_FRect fr = {0};                         // Find box bounding points
+                    SDL_EncloseFPoints(points, cnt, NULL, &fr);
+                    SDL_Rect src_rect = {(int)fr.x, (int)fr.y, (int)fr.w+depth, (int)fr.h+depth};
                     SDL_Rect dst_rect = src_rect;               // Scale 1 : 1
                     dst_rect.x = 50; dst_rect.y = cS->val[Y1];  // Put top-view left of iso-view
+                    SDL_RECT.x = dst_rect.x; SDL_RECT.y = dst_rect.y;
+                    SDL_RECT.w = dst_rect.w; SDL_RECT.h = dst_rect.h;
                     // Render
                     SDL_SetRenderTarget(ren, Tex_top);          // Render to this texture
                     SDL_SetRenderDrawColor(ren, 0,0,0,0);       // Start with blank texture
                     SDL_RenderClear(ren);
-                    SDL_SetRenderDrawColor(ren, 150,60,140,115);// Line color for ghosted top-view
-                    SDL_RenderDrawLines(ren, points, cnt);      // Connect the dots
+                    SDL_SetRenderDrawColor(ren, 150,60,140,150);// Line color for ghosted top-view
+                    SDL_RenderDrawLinesF(ren, points, cnt);      // Connect the dots
+                    { // Hatch lines (drop vertical from each point)
+                        /* SDL_SetRenderDrawColor(ren,  97,51,233,150); // Muted purple : vertical lines */
+                        SDL_SetRenderDrawColor(ren,  97,51,233,255); // Muted purple : vertical lines
+                        for(int i=0; i<cnt_seg; i++)
+                        {
+                            AffSeg seg = depth_art[i];
+                            SDL_RenderDrawLineF(ren, seg.A.x, seg.A.y, seg.B.x, seg.B.y);
+                        }
+                    }
+                    { // Draw rect controlled by overlay -- cool looks like walking thing
+                        SDL_SetRenderDrawColor(ren, cS->val[R],cS->val[G],cS->val[B],cS->val[A]);
+                        /* SDL_Rect origin = {cS->val[X1]-cS->val[W]/2, cS->val[Y1]-cS->val[H]/2, cS->val[W], cS->val[H]}; */
+                        { // seg.A
+                            int x = (int)(AFFSEG.A.x); int y = (int)(AFFSEG.A.y);
+                            SDL_Rect origin = {x - cS->val[W]/2, y - cS->val[H]/2, cS->val[W], cS->val[H]};
+                            SDL_RenderDrawRect(ren, &origin);
+                        }
+                        { // seg.B
+                            int x = (int)(AFFSEG.B.x); int y = (int)(AFFSEG.B.y);
+                            SDL_Rect origin = {x - cS->val[W]/2, y - cS->val[H]/2, cS->val[W], cS->val[H]};
+                            SDL_RenderDrawRect(ren, &origin);
+                        }
+                    }
                     SDL_SetRenderTarget(ren, NULL);             // Set renderer back to screen
                     SDL_RenderCopy(ren, Tex_top, &src_rect, &dst_rect);
                 }
 
-                SDL_Point offset = {cS->val[X1], cS->val[Y1]};  // Translate origin 0,0
                 for( int i=0; i<cnt; i++)
-                {
-                    point_map_top_to_iso(&points[i]);
-                    point_move(&points[i], offset);
+                { // map from top to iso
+                    point_fmap_top_to_iso(&points[i]);
+                    point_fmove(&points[i], offset);
                 }
                 SDL_SetRenderDrawColor(ren, 170,51,233,174);         // Live purple : path
                 /* SDL_SetRenderDrawColor(ren,  97,51,233,174);         // Muted purple : vertical lines */
                 /* SDL_SetRenderDrawColor(ren, 150,60,140,115);// Line color for ghosted top-view */
-                SDL_RenderDrawLines(ren, points, cnt);      // Connect the dots
+                SDL_RenderDrawLinesF(ren, points, cnt);      // Connect the dots
                 { // Hatch lines (drop vertical from each point)
-                    int len = 10; // cS->val[S]*3;
+                    for( int i=0; i<cnt_seg; i++)
+                    { // map from top to iso
+                        point_fmap_top_to_iso(&depth_art[i].A);
+                        point_fmap_top_to_iso(&depth_art[i].B);
+                        point_fmove(&depth_art[i].A, offset);
+                        point_fmove(&depth_art[i].B, offset);
+                    }
                     SDL_SetRenderDrawColor(ren,  97,51,233,130);         // Muted purple : vertical lines
-
-                    for( int i=0; i<cnt; i++)
+                    for(int i=0; i<cnt_seg; i++)
                     {
-                        if(  has_hatch[i]  )
-                        {
-                            int x = points[i].x; int y = points[i].y;
-                            Line l = {x, y, x, y+len};
-                            line_draw(ren, l);
-                        }
+                        AffSeg seg = depth_art[i];
+                        SDL_RenderDrawLineF(ren, seg.A.x, seg.A.y, seg.B.x, seg.B.y);
                     }
                 }
+                if(1)
+                { // Draw rect controlled by overlay -- cool looks like walking thing
+                    SDL_SetRenderDrawColor(ren, cS->val[R],cS->val[G],cS->val[B],cS->val[A]);
+                    /* SDL_Rect origin = {cS->val[X1]-cS->val[W]/2, cS->val[Y1]-cS->val[H]/2, cS->val[W], cS->val[H]}; */
+                    SDL_Point offset = {cS->val[X1], cS->val[Y1]};  // Translate origin 0,0
+                    { // seg.A
+                        int x = (int)(AFFSEG.A.x); int y = (int)(AFFSEG.A.y);
+                        // map from top to iso
+                        SDL_Point o = {x,y};
+                        point_map_top_to_iso(&o);
+                        point_move(&o, offset);
+                        SDL_Rect origin = {o.x - cS->val[W]/2, o.y - cS->val[H]/2, cS->val[W], cS->val[H]};
+                        SDL_RenderDrawRect(ren, &origin);
+                    }
+                    { // seg.B
+                        int x = (int)(AFFSEG.B.x); int y = (int)(AFFSEG.B.y);
+                        // map from top to iso
+                        SDL_Point o = {x,y};
+                        point_map_top_to_iso(&o);
+                        point_move(&o, offset);
+                        SDL_Rect origin = {o.x - cS->val[W]/2, o.y - cS->val[H]/2, cS->val[W], cS->val[H]};
+                        SDL_RenderDrawRect(ren, &origin);
+                    }
+                }
+                free(path_border);
+                free(depth_art);
             }
 
         }
