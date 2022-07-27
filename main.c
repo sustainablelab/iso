@@ -23,6 +23,8 @@
 #include "point.h"
 #include "aff.h"
 
+bool do_once = true;
+int cnt_down = 20;
 
 // Singletons
 SDL_Window *win;                                                // The window
@@ -468,33 +470,33 @@ int main(int argc, char *argv[])
                 SDL_FPoint offset = {cS->val[X1], cS->val[Y1]};  // Translate origin 0,0
                 SDL_FPOINT.x = offset.x; SDL_FPOINT.y = offset.y;
 
-                float s = (float)cS->val[S];
+                float s = (float)(cS->val[S]);
                 // Simple shape for debug
-                AffPoint points[] = {
-                    (AffPoint){ 0*s, 0*s},
-                    (AffPoint){ 0*s, 4*s},
-                    (AffPoint){ 4*s, 4*s},
-                    (AffPoint){ 4*s, 0*s},
-                    (AffPoint){ 0*s, 0*s}
-                    };
-                // TODO: switch back to fancier shape
                 /* AffPoint points[] = { */
                 /*     (AffPoint){ 0*s, 0*s}, */
-                /*     (AffPoint){ 0*s, 3*s}, */
-                /*     (AffPoint){ 1*s, 3*s}, */
-                /*     (AffPoint){ 1*s, 4*s}, */
-                /*     (AffPoint){ 0*s, 4*s}, */
-                /*     (AffPoint){ 0*s,10*s}, */
-                /*     (AffPoint){ 1*s,10*s}, */
-                /*     (AffPoint){ 1*s, 5*s}, */
-                /*     (AffPoint){ 2*s, 5*s}, */
-                /*     (AffPoint){ 2*s, 2*s}, */
-                /*     (AffPoint){ 1*s, 2*s}, */
-                /*     (AffPoint){ 1*s, 1*s}, */
-                /*     (AffPoint){10*s, 1*s}, */
-                /*     (AffPoint){10*s, 0*s}, */
+                /*     (AffPoint){ 0*s, 5*s}, */
+                /*     (AffPoint){ 4*s, 5*s}, */
+                /*     (AffPoint){ 4*s, 0*s}, */
                 /*     (AffPoint){ 0*s, 0*s} */
                 /*     }; */
+                // TODO: switch back to fancier shape
+                AffPoint points[] = {
+                    (AffPoint){ 0*s, 0*s},
+                    (AffPoint){ 0*s, 3*s},
+                    (AffPoint){ 1*s, 3*s},
+                    (AffPoint){ 1*s, 4*s},
+                    (AffPoint){ 0*s, 4*s},
+                    (AffPoint){ 0*s,10*s},
+                    (AffPoint){ 1*s,10*s},
+                    (AffPoint){ 1*s, 5*s},
+                    (AffPoint){ 2*s, 5*s},
+                    (AffPoint){ 2*s, 2*s},
+                    (AffPoint){ 1*s, 2*s},
+                    (AffPoint){ 1*s, 1*s},
+                    (AffPoint){10*s, 1*s},
+                    (AffPoint){10*s, 0*s},
+                    (AffPoint){ 0*s, 0*s}
+                    };
                 int cnt = (int)(sizeof(points)/sizeof(AffPoint));
 
                 // Define "path border"
@@ -514,7 +516,7 @@ int main(int argc, char *argv[])
 
                 // Vertical depth artwork
                 AffSeg *depth_art = malloc(sizeof(AffSeg)*cnt_seg);
-                int depth = cS->val[D];
+                float depth = (float)(cS->val[D]);
                 { // Define vertical depth lines
                     // Go through the points. For each point A:
                     // make a directed line segment sAZ (from A to Z)
@@ -526,6 +528,9 @@ int main(int argc, char *argv[])
                         depth_art[i] = (AffSeg){A,Z};
                     }
                 }
+                // No need to check for clipping if seg.B is not inside the path polygon
+                // How do I check that?
+
                 if(1)
                 { // Clip vertical depth lines where visually obscured by path border
                     /* *************DOC***************
@@ -558,6 +563,7 @@ int main(int argc, char *argv[])
                     // Iterate over the depth art segments
                     for(int i=0; i<cnt_seg; i++)
                     {
+                        int M_cnt = 0;                          // DEBUG: cnt number of intersections
                         for(int j=0; j<cnt_seg; j++)
                         {
                             // Find intersection with each AffLine in path_lines
@@ -618,13 +624,28 @@ int main(int argc, char *argv[])
                             // Does this point lie on both line segments?
                             AffSeg ds = depth_art[i];           // depth seg
                             AffSeg ps = path_border[j];         // path seg
+                            if(do_once)
+                            {
+                                printf("M : on path seg %d: %s\t",j,aff_point_on_seg(M,ps)?"T":"F");
+                                printf("on depth seg %d: %s\t",i,aff_point_on_seg(M,ds)?"T":"F");
+                                printf("on both? %s\n", (  aff_point_on_seg(M, ps) && aff_point_on_seg(M, ds)  )?"T":"F");
+                                /* cnt_down--; if(cnt_down == 0) do_once = false; */
+                            }
                             if(  aff_point_on_seg(M, ps) && aff_point_on_seg(M, ds)  )
                             { // The border path segment and depth line segment intersect at M
-                                if(1) // TODO: figure out why this is wrong
+                                if(0) // TODO: figure out why this is wrong
                                 {
+                                    // This is definitely the wrong logic.
+                                    // The number of intersections doesn't make any sense.
                                     depth_art[i].B = M;         // Clip depth art at intersection
                                 }
+                                M_cnt++;                        // DEBUG
                             }
+                        }
+                        if(do_once)
+                        {
+                            printf("M_cnt : depth seg %d: %d\n",i,M_cnt);fflush(stdout);
+                            cnt_down--; if(cnt_down == 0) do_once = false;
                         }
                     }
                     free(path_lines);                           // Done with these lines

@@ -94,6 +94,8 @@ AffLine aff_join_of_points(AffPoint A, AffPoint B)
     return l;
 }
 
+/* bool do_once = true; */
+/* int cnt_down = 20; */
 AffPoint aff_meet_of_lines(AffLine l1, AffLine l2)
 { // Return meet of lines l1 and l2
     float a1 = l1.a; float b1 = l1.b; float c1 = l1.c;
@@ -101,6 +103,11 @@ AffPoint aff_meet_of_lines(AffLine l1, AffLine l2)
     float det = 1/(a1*b2 - a2*b1);
     float x = det*(b2*c1 - b1*c2);
     float y = det*(a1*c2 - a2*c1);
+    /* if(do_once) */
+    /* { */
+    /*     printf("det: %f, x: %f, y: %f\n", det, x, y); */
+    /*     cnt_down--; if(cnt_down==0) do_once = false; */
+    /* } */
     AffPoint M = {x,y};
     return M;
 }
@@ -133,5 +140,6 @@ bool aff_point_on_seg(AffPoint M, AffSeg seg)
     if(  lambda > 1  ) { return false;}                         // lambda > 1 -- point is off line seg
     else { return true; }                                       // lambda <=1 -- point is on line seg
 }
+
 #endif // __AFF_H__
 
